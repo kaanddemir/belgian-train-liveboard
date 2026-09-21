@@ -25,7 +25,7 @@
 
 import { normalizeStationName } from '../data/rail/normalizeStationName.js';
 
-const GRAPH_URL = '/generated/belgian-rail-graph.json';
+const GRAPH_URL = `${import.meta.env.BASE_URL}generated/belgian-rail-graph.json`;
 
 // Vite replaces `import.meta.env` with a literal, so this folds to false
 // in a production build and the logging goes with it. The `typeof` guard
