@@ -3,12 +3,13 @@ import { getStations, searchStations } from '../services/irail.js';
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
-// One dialog, two faces. Opening the search button always lands on the
-// picker as it has always been; From -> To is a secondary action beneath
-// it, and it swaps the contents of the same panel rather than opening
-// anything new.
+// One dialog, three faces. Opening the search button always lands on the
+// picker as it has always been; From -> To and Favourites are secondary
+// actions beneath it, and each swaps the contents of the same panel
+// rather than opening anything new.
 const STATION = 'station';
 const ROUTE = 'route';
+const FAVORITES = 'favorites';
 
 // How long the outgoing face is given to fade out before the incoming one
 // is mounted. Matches --transition-fast, which is what styles.css runs the
@@ -21,6 +22,7 @@ const prefersReducedMotion = () =>
 export default function StationModal({
   open, onClose, onSelect, onRoute, t, lang = 'nl',
   currentStation = null, destination = null,
+  favorites = [], onToggleFavorite,
 }) {
   const [stations, setStations] = useState(null);   // { lang, list }
   const [mode, setMode] = useState(STATION);
@@ -34,6 +36,9 @@ export default function StationModal({
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [failed, setFailed] = useState(false);
+  // Shown only after a refused sixth favourite, and only until the next
+  // change: the limit is not a standing warning.
+  const [atLimit, setAtLimit] = useState(false);
 
   // Route mode holds canonical station objects, never the typed text. The
   // query strings are only what is in the two fields; a field with no
@@ -51,6 +56,11 @@ export default function StationModal({
   const dialogRef = useRef(null);
   const openerRef = useRef(null);
   const routeLinkRef = useRef(null);
+  const favoritesLinkRef = useRef(null);
+  const backRef = useRef(null);
+  // Which of the two secondary actions the panel left by, so coming back
+  // returns focus to it and not to whichever one is written first.
+  const leftBy = useRef(routeLinkRef);
   const exitTimer = useRef(0);
   // Whether the user has touched the From field during this opening. The
   // default origin is seeded from the board's station, which is only
@@ -85,6 +95,8 @@ export default function StationModal({
     setTo(destination);
     setToQuery(destination?.name || '');
     setField('to');
+    setAtLimit(false);
+    leftBy.current = routeLinkRef;
     fromTouched.current = false;
     const id = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(id);
@@ -125,7 +137,8 @@ export default function StationModal({
         // From is already filled in, so the destination is what is being
         // asked for; coming back, focus returns to the control that left.
         if (target === ROUTE) (toRef.current || fromRef.current)?.focus();
-        else routeLinkRef.current?.focus();
+        else if (target === FAVORITES) backRef.current?.focus();
+        else leftBy.current.current?.focus();
       });
     };
     if (prefersReducedMotion()) { arrive(); return; }
@@ -185,6 +198,34 @@ export default function StationModal({
 
   const choose = (station) => { onSelect(station); onClose(); };
 
+  /* --- favourites --------------------------------------------------- */
+
+  // Identity is the canonical station id, so the star is right whatever
+  // language the list is in.
+  const favoriteIds = new Set(favorites.map((s) => s.id));
+
+  // Toggling never selects a station and never closes the panel: the star
+  // is a control of its own, sitting on a row that does something else.
+  const star = (station) => {
+    const on = favoriteIds.has(station.id);
+    return (
+      <button
+        type="button"
+        className={`station-star${on ? ' is-on' : ''}`}
+        aria-pressed={on}
+        aria-label={on ? t.favoriteRemove(station.name) : t.favoriteAdd(station.name)}
+        // mousedown would otherwise reach the suggestion row underneath
+        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setAtLimit(!onToggleFavorite(station));
+        }}
+      >
+        <span aria-hidden="true">{on ? '★' : '☆'}</span>
+      </button>
+    );
+  };
+
   /* --- route mode --------------------------------------------------- */
 
   const pickRoute = (station) => {
@@ -231,7 +272,7 @@ export default function StationModal({
         ? t.noResults
         : null;
 
-  const suggestions = (commit) => (
+  const suggestions = (commit, withStar = false) => (
     results.length > 0 && (
       <ul className="station-results" id="station-results" role="listbox" ref={listRef}>
         {results.map((station, i) => (
@@ -245,7 +286,8 @@ export default function StationModal({
             // mousedown, not click: the input must not blur first
             onMouseDown={(e) => { e.preventDefault(); commit(station); }}
           >
-            {station.name}
+            <span className="station-result__name">{station.name}</span>
+            {withStar && star(station)}
           </li>
         ))}
       </ul>
@@ -266,7 +308,7 @@ export default function StationModal({
         className="station-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={mode === ROUTE ? t.modeRoute : t.pick}
+        aria-label={mode === ROUTE ? t.modeRoute : mode === FAVORITES ? t.favorites : t.pick}
       >
         {mode === STATION ? (
           <div className={faceClass} key={STATION}>
@@ -295,30 +337,96 @@ export default function StationModal({
 
             {status && <p className="station-status" role="status" aria-live="polite">{status}</p>}
 
-            {suggestions(choose)}
+            {suggestions(choose, true)}
 
-            {/* The second thing the search button can do, offered rather
-                than asked about: the picker is already usable above it. */}
-            <button
-              type="button"
-              ref={routeLinkRef}
-              className="station-route-link"
-              onClick={() => goTo(ROUTE)}
-            >
-              <svg className="station-route-link__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <line x1="3.5" y1="12" x2="18" y2="12" />
-                <polyline points="13.5 7 18.5 12 13.5 17" />
-              </svg>
-              <span className="station-route-link__text">
-                <span className="station-route-link__label">{t.modeRoute}</span>
-                <span className="station-route-link__hint">{t.modeRouteHint}</span>
-              </span>
-            </button>
+            {/* The other two things the search button can do, offered
+                rather than asked about: the picker is already usable
+                above them, and each opens in this same panel. */}
+            <div className="station-actions">
+              <button
+                type="button"
+                ref={routeLinkRef}
+                className="station-action"
+                onClick={() => { leftBy.current = routeLinkRef; goTo(ROUTE); }}
+              >
+                <svg className="station-action__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <line x1="3.5" y1="12" x2="18" y2="12" />
+                  <polyline points="13.5 7 18.5 12 13.5 17" />
+                </svg>
+                <span className="station-action__text">
+                  <span className="station-action__label">{t.modeRoute}</span>
+                  <span className="station-action__hint">{t.modeRouteHint}</span>
+                </span>
+              </button>
+
+              {/* Offered whether or not anything is saved yet: the face it
+                  opens says so itself rather than the action disappearing. */}
+              <button
+                type="button"
+                ref={favoritesLinkRef}
+                className="station-action"
+                onClick={() => { leftBy.current = favoritesLinkRef; goTo(FAVORITES); }}
+              >
+                <svg className="station-action__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <polygon points="12 4 14.5 9.2 20.2 10 16.1 14 17.1 19.7 12 17 6.9 19.7 7.9 14 3.8 10 9.5 9.2" />
+                </svg>
+                <span className="station-action__text">
+                  <span className="station-action__label">{t.favorites}</span>
+                  <span className="station-action__hint">{t.favoritesHint}</span>
+                </span>
+              </button>
+            </div>
+
+            {atLimit && (
+              <p className="station-status" role="status" aria-live="polite">
+                {t.favoriteLimit}
+              </p>
+            )}
+          </div>
+        ) : mode === FAVORITES ? (
+          <div className={faceClass} key={FAVORITES}>
+            <div className="station-modal__bar">
+              <button
+                type="button"
+                ref={backRef}
+                className="station-back"
+                onClick={() => goTo(STATION)}
+              >
+                <svg className="station-back__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="14.5 5 7.5 12 14.5 19" />
+                </svg>
+                {t.back}
+              </button>
+            </div>
+
+            {favorites.length === 0 ? (
+              <p className="station-status">{t.favoritesEmpty}</p>
+            ) : (
+              <ul className="station-favorites__list">
+                {favorites.map((station) => (
+                  <li key={station.id} className="station-favorite">
+                    <button
+                      type="button"
+                      className="station-favorite__name"
+                      onClick={() => choose(station)}
+                    >
+                      {station.name}
+                    </button>
+                    {star(station)}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         ) : (
           <div className={faceClass} key={ROUTE}>
             <div className="station-modal__bar">
-              <button type="button" className="station-back" onClick={() => goTo(STATION)}>
+              <button
+                type="button"
+                ref={backRef}
+                className="station-back"
+                onClick={() => goTo(STATION)}
+              >
                 <svg className="station-back__icon" viewBox="0 0 24 24" aria-hidden="true">
                   <polyline points="14.5 5 7.5 12 14.5 19" />
                 </svg>

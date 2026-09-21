@@ -110,10 +110,11 @@ node scripts/data/build-rail-network.mjs
 
 ## Privacy
 
-The application has no user accounts, authentication, analytics, tracking, or cookies. It stores only two preferences in `localStorage`:
+The application has no user accounts, authentication, analytics, tracking, or cookies. It stores only three preferences in `localStorage`:
 
 - `lastStationSlug` — the last station selected
 - `preferredLanguage` — the last language selected
+- `favoriteStationSlugs` — up to 5 favourite station slugs
 
 Departure boards, train journeys, destination filters, and API caches are not persisted. Requests for railway data go directly from the browser to iRail; opening the optional map also requests the local rail graph and OpenStreetMap tiles.
 

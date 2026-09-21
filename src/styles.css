@@ -969,6 +969,9 @@ body{
 }
 .station-result{
   position:relative;
+  display:flex;
+  align-items:center;
+  gap:var(--space-2);
   padding:clamp(11px, 1.5vh, 16px) clamp(16px, 2.4vw, 26px);
   border-radius:var(--radius-pill);
   color:var(--color-surface-ink-muted);
@@ -996,6 +999,86 @@ body{
   background:var(--color-topbar);
 }
 
+.station-result__name{ flex:1 1 auto; min-width:0; }
+
+/* --- favourites ---------------------------------------------------- */
+/* Its own face, reached from the action row and left by the same back
+   control as From -> To. The rows are the suggestion row again, on the
+   same surface, with the picker's one accent — the title-bar blue — on
+   the star that is switched on. */
+
+.station-favorites__list{
+  list-style:none;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:var(--space-2);
+  border-radius:var(--radius-lg);
+  border:1px solid var(--color-surface-line);
+  background:var(--surface-gradient);
+  box-shadow:var(--shadow-inset-edge), var(--shadow-panel);
+}
+.station-favorite{
+  display:flex;
+  align-items:center;
+  gap:var(--space-2);
+  border-radius:var(--radius-pill);
+}
+.station-favorite:hover{ background:var(--color-surface-active); }
+.station-favorite__name{
+  flex:1 1 auto;
+  min-width:0;
+  padding:clamp(11px, 1.5vh, 16px) clamp(16px, 2.4vw, 26px);
+  border-radius:var(--radius-pill);
+  background:none;
+  border:0;
+  color:var(--color-surface-ink-muted);
+  font-family:inherit;
+  font-weight:var(--font-weight-regular);
+  font-size:var(--font-size-suggestion);
+  line-height:1.25;
+  text-align:left;
+  cursor:pointer;
+  transition:color var(--transition-fast);
+}
+.station-favorite__name:hover,
+.station-favorite__name:active{ color:var(--color-surface-ink); }
+.station-favorite__name:focus-visible{
+  color:var(--color-surface-ink);
+  outline:2px solid var(--color-topbar);
+  outline-offset:-2px;
+}
+
+.station-star{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:clamp(28px, 3.4vw, 36px);
+  height:clamp(28px, 3.4vw, 36px);
+  margin-right:clamp(6px, .9vw, 10px);
+  border:0;
+  border-radius:var(--radius-pill);
+  background:none;
+  color:var(--color-surface-icon);
+  font-family:inherit;
+  font-size:var(--font-size-suggestion);
+  line-height:1;
+  cursor:pointer;
+  transition:color var(--transition-fast), background-color var(--transition-fast);
+}
+.station-star.is-on{ color:var(--color-topbar); }
+.station-star:hover,
+.station-star:active{
+  background:var(--color-surface-active);
+  color:var(--color-surface-ink);
+}
+.station-star.is-on:hover,
+.station-star.is-on:active{ color:var(--color-topbar); }
+.station-star:focus-visible{
+  outline:2px solid var(--color-topbar);
+  outline-offset:-2px;
+}
+
 .station-status{
   padding:0 var(--station-field-inset);
   color:var(--color-picker-status-text);
@@ -1020,7 +1103,8 @@ body{
    to the left, the route form from the right. One custom property, so
    the two keyframes below serve both directions. */
 .station-face--station{ --face-shift:-8px; }
-.station-face--route{ --face-shift:8px; }
+.station-face--route,
+.station-face--favorites{ --face-shift:8px; }
 
 @keyframes station-face-in{
   from{ opacity:0; transform:translateX(var(--face-shift)); }
@@ -1036,37 +1120,47 @@ body{
 /* after .is-entering, so a face on its way out wins */
 .station-face.is-leaving{ animation:station-face-out var(--transition-fast) both; }
 
-/* --- the second thing the search button can do -------------------- */
-/* Offered under the picker rather than asked about before it: the same
-   surface, radius and hairline as the suggestion list, so it reads as
-   the foot of one search panel and not as a tab or a second page. */
+/* --- the secondary actions under the picker ----------------------- */
+/* One panel, not two cards: the same surface, radius and hairline as the
+   suggestion list carries both rows, so they read as the foot of one
+   search panel and not as tabs or a second page. The rows themselves are
+   the suggestion row again — flat until hovered. */
 
-.station-route-link{
+.station-actions{
   display:flex;
-  align-items:center;
-  gap:clamp(12px, 1.6vw, 20px);
-  padding:clamp(11px, 1.5vh, 16px) clamp(16px, 2.4vw, 26px);
+  flex-direction:column;
+  padding:var(--space-2);
   border-radius:var(--radius-lg);
   border:1px solid var(--color-surface-line);
   background:var(--surface-gradient);
   box-shadow:var(--shadow-inset-edge), var(--shadow-panel);
+}
+
+.station-action{
+  display:flex;
+  align-items:center;
+  gap:clamp(12px, 1.6vw, 20px);
+  padding:clamp(11px, 1.5vh, 16px) clamp(16px, 2.4vw, 26px);
+  border:0;
+  border-radius:var(--radius-pill);
+  background:none;
   color:var(--color-surface-ink-muted);
   font-family:inherit;
   text-align:left;
   cursor:pointer;
-  transition:color var(--transition-fast), border-color var(--transition-fast);
+  transition:background-color var(--transition-fast), color var(--transition-fast);
 }
-.station-route-link:hover{
+.station-action:hover,
+.station-action:active{
+  background:var(--color-surface-active);
   color:var(--color-surface-ink);
-  border-color:var(--color-surface-inset-edge);
 }
-.station-route-link:active{ color:var(--color-surface-ink); }
-.station-route-link:focus-visible{
+.station-action:focus-visible{
   color:var(--color-surface-ink);
   outline:2px solid var(--color-topbar);
   outline-offset:-2px;
 }
-.station-route-link__icon{
+.station-action__icon{
   flex:0 0 auto;
   width:clamp(19px, 2.4vw, 28px);
   height:clamp(19px, 2.4vw, 28px);
@@ -1076,13 +1170,13 @@ body{
   stroke-linecap:round;
   stroke-linejoin:round;
 }
-.station-route-link__text{ display:flex; flex-direction:column; gap:.15em; min-width:0; }
-.station-route-link__label{
+.station-action__text{ display:flex; flex-direction:column; gap:.15em; min-width:0; }
+.station-action__label{
   font-weight:var(--font-weight-bold);
   font-size:var(--font-size-suggestion);
   line-height:1.2;
 }
-.station-route-link__hint{
+.station-action__hint{
   color:var(--color-surface-ink-faint);
   font-weight:var(--font-weight-regular);
   font-size:var(--font-size-secondary);
@@ -2510,9 +2604,11 @@ body.modal-open{ overflow:hidden; }
   .station-field{ height:56px; }
   .station-input{ font-size:17px; }
   .station-result{ padding:14px 18px; font-size:16px; }
+  .station-favorite__name{ padding:14px 18px; font-size:16px; }
+  .station-star{ width:44px; height:44px; font-size:18px; }
   /* roughly 44px of tap target for every control the picker adds */
-  .station-route-link{ padding:14px 18px; }
-  .station-route-link__label{ font-size:16px; }
+  .station-action{ padding:14px 18px; }
+  .station-action__label{ font-size:16px; }
   .station-field--row{ height:48px; }
   .station-apply{ padding-block:15px; }
   /* The foot of the screen takes the same edge every other phone surface
@@ -2566,7 +2662,9 @@ body.modal-open{ overflow:hidden; }
   .about-panel{ animation:none; }
   .station-field,
   .station-result,
-  .station-route-link,
+  .station-favorite__name,
+  .station-star,
+  .station-action,
   .station-back,
   .station-apply,
   .notice__clear,

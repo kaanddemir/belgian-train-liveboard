@@ -508,12 +508,13 @@ The visual system, in short:
 
 ## Persistence
 
-Exactly two values are written to `localStorage`, and nothing else ever
+Exactly three values are written to `localStorage`, and nothing else ever
 is:
 
 ```text
 lastStationSlug     the station last chosen from the picker
 preferredLanguage   the language last picked from the title bar
+favoriteStationSlugs  up to 5 station slugs, in the order they were starred
 ```
 
 - Station resolution order on startup is **URL -> stored slug ->
@@ -525,6 +526,11 @@ preferredLanguage   the language last picked from the title bar
   to a history entry naming no station restores *that* station rather
   than whatever has been chosen since.
 - The From -> To destination is **not** persisted; only the origin is.
+- `favoriteStationSlugs` is a JSON array of canonical slugs, never
+  translated names. It is validated on read — array, strings only, no
+  duplicates, clamped to 5 — and resolved through `findStationBySlug()`
+  like any other slug, so an unresolvable entry is simply not offered.
+  A sixth favourite is refused; the five in hand are never replaced.
 - Never persist railway data: no board, no journeys, no API cache.
 - Every storage access is wrapped in try/catch. Private windows and
   blocked site data must fall back to the defaults without an error.

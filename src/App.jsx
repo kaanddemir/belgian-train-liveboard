@@ -131,6 +131,12 @@ const TEXT = {
     loading: 'Stations laden…',
     noResults: 'Geen station gevonden',
     listFailed: 'Stationslijst niet beschikbaar',
+    favorites: 'Favorieten',
+    favoritesHint: 'Opgeslagen stations',
+    favoritesEmpty: 'Nog geen favoriete stations.',
+    favoriteAdd: (s) => `${s} aan favorieten toevoegen`,
+    favoriteRemove: (s) => `${s} uit favorieten verwijderen`,
+    favoriteLimit: 'Je kunt maximaal 5 favoriete stations opslaan.',
     language: 'Taal',
     menu: 'Menu',
     about: 'Over dit bord',
@@ -199,6 +205,12 @@ const TEXT = {
     loading: 'Chargement des gares…',
     noResults: 'Aucune gare trouvée',
     listFailed: 'Liste des gares indisponible',
+    favorites: 'Favoris',
+    favoritesHint: 'Gares enregistrées',
+    favoritesEmpty: 'Aucune gare favorite pour le moment.',
+    favoriteAdd: (s) => `Ajouter ${s} aux favoris`,
+    favoriteRemove: (s) => `Retirer ${s} des favoris`,
+    favoriteLimit: 'Vous pouvez enregistrer jusqu’à 5 gares favorites.',
     language: 'Langue',
     menu: 'Menu',
     about: 'À propos',
@@ -267,6 +279,12 @@ const TEXT = {
     loading: 'Loading stations…',
     noResults: 'No station found',
     listFailed: 'Station list unavailable',
+    favorites: 'Favorites',
+    favoritesHint: 'Saved stations',
+    favoritesEmpty: 'No favorite stations yet.',
+    favoriteAdd: (s) => `Add ${s} to favorites`,
+    favoriteRemove: (s) => `Remove ${s} from favorites`,
+    favoriteLimit: 'You can save up to 5 favorite stations.',
     language: 'Language',
     menu: 'Menu',
     about: 'About',
@@ -335,6 +353,12 @@ const TEXT = {
     loading: 'Bahnhöfe werden geladen…',
     noResults: 'Kein Bahnhof gefunden',
     listFailed: 'Bahnhofsliste nicht verfügbar',
+    favorites: 'Favoriten',
+    favoritesHint: 'Gespeicherte Bahnhöfe',
+    favoritesEmpty: 'Noch keine Lieblingsbahnhöfe.',
+    favoriteAdd: (s) => `${s} zu den Favoriten hinzufügen`,
+    favoriteRemove: (s) => `${s} aus den Favoriten entfernen`,
+    favoriteLimit: 'Sie können bis zu 5 Lieblingsbahnhöfe speichern.',
     language: 'Sprache',
     menu: 'Menü',
     about: 'Über diese Tafel',
@@ -413,13 +437,19 @@ function fitRows(measuredHeight) {
 
 /* --- remembered preferences ------------------------------------- */
 
-// Two scraps of user intent survive a reload: the station last chosen and
-// the language last picked. Nothing else is persisted — no board, no
-// journeys, no filter, no API cache. Storage is treated as unavailable at
-// any moment (private windows, blocked site data), so every access is
-// guarded and the app simply falls back to its defaults.
+// Three scraps of user intent survive a reload: the station last chosen,
+// the language last picked, and the handful of stations starred as
+// favourites. Nothing else is persisted — no board, no journeys, no
+// filter, no API cache. Storage is treated as unavailable at any moment
+// (private windows, blocked site data), so every access is guarded and the
+// app simply falls back to its defaults.
 const STORE_STATION = 'lastStationSlug';
 const STORE_LANG = 'preferredLanguage';
+const STORE_FAVORITES = 'favoriteStationSlugs';
+
+// A deliberately short list: the picker offers favourites as a shortcut,
+// not as a second board.
+const MAX_FAVORITES = 5;
 
 function readStored(key) {
   try {
@@ -433,6 +463,34 @@ function readStored(key) {
 function writeStored(key, value) {
   try {
     window.localStorage.setItem(key, value);
+  } catch { /* storage unavailable: the session simply does not remember */ }
+}
+
+// Favourites are stored as canonical slugs — the same readable identifier
+// the URL carries — never as translated names. Anything else in the key is
+// treated as noise: not an array, entries that are not strings, duplicates
+// and anything past the fifth are dropped rather than trusted.
+function readFavorites() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(STORE_FAVORITES));
+    if (!Array.isArray(parsed)) return [];
+    const slugs = [];
+    for (const entry of parsed) {
+      if (typeof entry !== 'string') continue;
+      const slug = entry.trim();
+      if (!slug || slugs.includes(slug)) continue;
+      slugs.push(slug);
+      if (slugs.length === MAX_FAVORITES) break;
+    }
+    return slugs;
+  } catch {
+    return [];
+  }
+}
+
+function writeFavorites(slugs) {
+  try {
+    window.localStorage.setItem(STORE_FAVORITES, JSON.stringify(slugs));
   } catch { /* storage unavailable: the session simply does not remember */ }
 }
 
@@ -472,6 +530,7 @@ export default function App() {
   const [station, setStation] = useState(DEFAULT_STATION);
   const [stations, setStations] = useState(null);   // the /stations list
   const [unknownSlug, setUnknownSlug] = useState('');
+  const [favorites, setFavorites] = useState(readFavorites);
   // The From -> To filter: the whole destination station object, or null
   // for the ordinary full board. Same rule as `station` — one object, and
   // the name, the id and the slug are all derived from it.
@@ -599,6 +658,35 @@ export default function App() {
     writeStored(STORE_STATION, stationToSlug(origin));
     window.history.pushState(null, '', url);
   }, []);
+
+  /* --- favourite stations ----------------------------------------- */
+
+  // Stored slugs are resolved back through the same real /stations list as
+  // any other slug, so a favourite shows the station's name in the current
+  // language and a slug that matches nothing is simply not offered.
+  const favoriteStations = useMemo(() => {
+    if (!stations) return [];
+    return favorites
+      .map((slug) => findStationBySlug(stations, slug))
+      .filter(Boolean);
+  }, [favorites, stations]);
+
+  // Starring a station adds it to the end of the list, so the order is the
+  // order they were saved in. A sixth is refused outright rather than
+  // pushing one of the five out: the answer is `false`, and the picker says
+  // so. Never touches the board's own station.
+  const toggleFavorite = useCallback((picked) => {
+    const slug = stationToSlug(picked);
+    if (!slug) return false;
+    const next = favorites.includes(slug)
+      ? favorites.filter((s) => s !== slug)
+      : favorites.length >= MAX_FAVORITES ? null
+        : [...favorites, slug];
+    if (!next) return false;
+    setFavorites(next);
+    writeFavorites(next);
+    return true;
+  }, [favorites]);
 
   // Back to the full board for the same station, without leaving it.
   const clearDestination = useCallback(() => {
@@ -986,9 +1074,11 @@ export default function App() {
         lang={lang}
         currentStation={station}
         destination={destination}
+        favorites={favoriteStations}
         onClose={closeStationPicker}
         onSelect={selectStation}
         onRoute={selectRoute}
+        onToggleFavorite={toggleFavorite}
       />
 
       <AboutModal open={about} t={t} onClose={closeAbout} />
