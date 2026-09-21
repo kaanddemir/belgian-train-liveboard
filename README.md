@@ -2,9 +2,7 @@
 
 Belgian Train Liveboard is an independent, unofficial, non-commercial web application for viewing live SNCB/NMBS departures in a station-display-inspired interface. It uses public railway information from [iRail](https://docs.irail.be/).
 
-<p align="center">
-  <img src="docs/screenshots/liveboard-desktop.png" alt="Belgian Train Liveboard showing live departures from Bruxelles-Central on desktop" width="100%">
-</p>
+<img src="docs/screenshots/liveboard-desktop.png" alt="Belgian Train Liveboard showing live departures from Bruxelles-Central" width="100%">
 
 ## Features
 
@@ -16,26 +14,38 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
 - Optional interactive route map with pan, pinch, and zoom controls
 - Dutch, French, English, and German interfaces
 - Responsive desktop, tablet, and phone layouts
-- Installable on supported devices for an app-like standalone experience.
+- Installable on supported devices for an app-like standalone experience
 - Shareable `?station=` and `?to=` URLs with readable station slugs
 - Remembered station and language preferences
 - Keyboard-accessible controls, focus-managed dialogs, and reduced-motion support
 
 ## Screenshots
 
+### Desktop
+
+<img src="docs/screenshots/train-details-timeline-desktop.png" alt="Train Details panel with a route timeline and occupancy information" width="100%">
+
+*Train Details and route timeline*
+
+<img src="docs/screenshots/train-details-map-desktop.jpg" alt="Train Details interactive map showing a multi-stop railway route" width="100%">
+
+*Train Details interactive map*
+
+### Mobile
+
 <table>
   <tr>
-    <td align="center" width="24%">
-      <img src="docs/screenshots/liveboard-mobile.png" alt="Responsive Belgian Train Liveboard at phone width" width="220"><br>
-      <sub>Phone layout</sub>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/liveboard-mobile.png" alt="Belgian Train Liveboard mobile view" width="260"><br>
+      <sub><em>Liveboard</em></sub>
     </td>
-    <td align="center" width="38%">
-      <img src="docs/screenshots/train-details.png" alt="Train Details panel with a route timeline and occupancy information" width="440"><br>
-      <sub>Train Details and route timeline</sub>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/train-details-timeline-mobile.png" alt="Train Details route timeline on mobile" width="260"><br>
+      <sub><em>Train Details and route timeline</em></sub>
     </td>
-    <td align="center" width="38%">
-      <img src="docs/screenshots/train-details-map.png" alt="Train Details interactive map showing a multi-stop railway route" width="440"><br>
-      <sub>Train Details interactive map</sub>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/train-details-map-mobile.jpg" alt="Train Details interactive map on mobile" width="260"><br>
+      <sub><em>Train Details interactive map</em></sub>
     </td>
   </tr>
 </table>
@@ -51,14 +61,6 @@ Screenshots show live data from Bruxelles-Central; displayed services vary with 
 
 No API key is required.
 
-## How It Works
-
-Readable station slugs in the URL are resolved against iRail's station list. The application then uses the canonical iRail station ID for requests, so shared URLs remain human-readable without guessing railway identifiers.
-
-The liveboard refreshes every 30 seconds and keeps the last valid board visible if a later refresh fails. From → To filtering checks every current departure progressively and includes a train only when the destination appears later in that train's `/vehicle` route. Missing or failed route data is treated as unconfirmed, not as proof that no direct train exists.
-
-Train journey data is cached and shared between the board, filter, and details view. The map component, Leaflet bundle, and generated Belgian rail graph are loaded only after the map is opened.
-
 ## Tech Stack
 
 - React 18
@@ -69,6 +71,8 @@ Train journey data is cached and shared between the board, filter, and details v
 - Native Fetch, History, and browser storage APIs
 
 ## Running Locally
+
+Requires [Node.js](https://nodejs.org/) 18 or newer, as used by Vite 5.
 
 ```bash
 git clone https://github.com/kaanddemir/belgian-train-liveboard.git
@@ -90,11 +94,15 @@ There are no environment variables, backend services, or API credentials to conf
 
 ## Architecture
 
-This is a client-side Vite and React SPA built with function components, plain JavaScript, and one CSS stylesheet. Application state and the 30-second refresh lifecycle live in `src/App.jsx`; railway API access, normalization, pacing, and caching live in `src/services/irail.js`.
+Application state and the 30-second refresh lifecycle live in `src/App.jsx`, which passes data down to presentational components; railway API access, normalization, pacing, and caching live in `src/services/irail.js`. URL state uses the native History API—there is no router or state-management library.
 
-All iRail requests pass through one scheduler with global pacing and high/normal priorities. Train journey requests are serialized, deduplicated in flight, and stored in bounded session caches. URL state uses the native History API—there is no router or state-management library.
+Readable station slugs in the URL are resolved against iRail's station list. The application then uses the canonical iRail station ID for requests, so shared URLs remain human-readable without guessing railway identifiers.
 
-`TrainRouteMap.jsx` is dynamically imported from Train Details. It loads Leaflet and fetches `public/generated/belgian-rail-graph.json` only when needed. The graph is generated manually from Infrabel's public datasets with:
+The liveboard refreshes every 30 seconds and keeps the last valid board visible if a later refresh fails. From → To filtering checks every current departure progressively and includes a train only when the destination appears later in that train's `/vehicle` route. Missing or failed route data is treated as unconfirmed, not as proof that no direct train exists.
+
+All iRail requests pass through one scheduler with global pacing and high/normal priorities. Train journey requests are serialized, deduplicated in flight, and stored in bounded session caches, so a single journey lookup serves the board, the filter, and the details view alike.
+
+`TrainRouteMap.jsx` is dynamically imported from Train Details. It loads Leaflet and fetches `public/generated/belgian-rail-graph.json` only when the map is opened, keeping both off the initial board load. The graph is generated manually from Infrabel's public datasets with:
 
 ```bash
 node scripts/data/build-rail-network.mjs
