@@ -1,0 +1,2578 @@
+/* ------------------------------------------------------------------
+   SNCB / NMBS station information screens (2023 layout)
+
+   Two real screen types, both measured from photographs of installed
+   displays rather than approximated:
+
+   .layout-compact   concourse overview — single-line rows, status
+                     badges in their own column, "via" list inline
+   .layout-platform  platform detail — tall bands, stop list printed
+                     underneath the destination
+
+   Sizing rule: every board measurement is a fraction of the row height,
+   which is itself a fraction of the viewport. The reference proportions
+   therefore hold at 1366x768, 1920x1080 and 2560x1440 alike. clamp()
+   only guards the extremes. Breakpoints change the fractions (--f-*)
+   and the column tracks, never the design.
+
+   Sections:
+     Design tokens · Reset / base · App layout · Header · Departure
+     board · Departure row (compact) · Departure row (platform) ·
+     Station modal (picker · From -> To) · Train details · Responsive ·
+     Reduced motion
+   ------------------------------------------------------------------ */
+
+/* =========================
+   Design Tokens
+   ========================= */
+
+:root{
+  /* --- board palette, sampled pixel by pixel from the screens ----- */
+  --color-board-bg:      #0f3054;
+  --color-board-text:    #ffffff;
+  --color-topbar:        #006ab2;
+  --color-destination:   #ffcc05;   /* also the "notice" yellow */
+  --color-alert:         #eb2e2b;   /* delays and cancellations */
+  --color-divider:       var(--color-board-text);
+  --color-board-muted:   .55;       /* opacity for absent values */
+
+  /* --- station picker surfaces ----------------------------------- */
+  /* Not #ffffff: a paper-white cooled towards the board's blue, so a
+     lit panel on a dark screen does not glare. Type is the board's own
+     dark blue, as in its platform-change box — the one place the
+     screen already turns its palette inside out. */
+  --color-overlay:            rgba(4, 10, 20, .58);
+  --color-surface-top:        #edf1f6;
+  --color-surface-bottom:     #dfe5ee;
+  --color-surface-ink:        var(--color-board-bg);
+  --color-surface-ink-muted:  rgba(15, 48, 84, .78);
+  --color-surface-ink-faint:  rgba(15, 48, 84, .42);
+  --color-surface-icon:       rgba(15, 48, 84, .60);
+  --color-surface-line:       rgba(15, 48, 84, .10);
+  --color-surface-hover:      rgba(15, 48, 84, .07);
+  --color-surface-active:     rgba(15, 48, 84, .09);
+  --color-surface-inset-edge: rgba(15, 48, 84, .08);
+  --color-surface-focus-border:var(--color-topbar);
+  --color-surface-focus-halo: rgba(255, 255, 255, .35);
+  --color-surface-focus-glow: rgba(255, 255, 255, .18);
+  --color-picker-status-text: rgba(255, 255, 255, .55);
+  --color-control-hover:      rgba(255, 255, 255, .14);
+  --color-control-active:     rgba(255, 255, 255, .20);
+  --color-alert-strong:       color-mix(in srgb, var(--color-alert) 80%, var(--color-board-bg));
+  --surface-gradient: linear-gradient(180deg,
+    var(--color-surface-top) 0%, var(--color-surface-bottom) 100%);
+
+  /* --- typography ------------------------------------------------- */
+  /* Humanist sans in the spirit of the screens' Frutiger-like face.
+     Nothing proprietary: system / metric-compatible faces only. */
+  --font-family-primary: "Helvetica Neue", Helvetica, Arial,
+                         "Liberation Sans", "Nimbus Sans",
+                         "DejaVu Sans", sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-bold:    700;
+
+  /* board type is derived from --row-h; these are the fixed roles */
+  --font-size-topbar-primary:   clamp(17px, calc(var(--bar-h) * 0.40), 56px);
+  --font-size-topbar-secondary: clamp(11px, calc(var(--bar-h) * 0.26), 32px);
+  /* between the two topbar roles: strong enough to balance the bar's
+     controls, still clearly under the centred title */
+  --font-size-topbar-label:     clamp(14px, calc(var(--bar-h) * 0.32), 40px);
+  --font-size-notice:           clamp(12px, calc(var(--bar-h) * 0.30), 30px);
+  --font-size-input:            clamp(17px, 2.5vw, 30px);
+  --font-size-suggestion:       clamp(15px, 1.9vw, 21px);
+  --font-size-secondary:        clamp(13px, 1.6vw, 17px);
+  --font-size-menu-item:        clamp(12px, 1.1vw, 16px);
+  /* The train label and platform form one compact metadata pair. */
+  --font-size-meta:             clamp(13px, calc(var(--row-h) * var(--f-meta)), 58px);
+
+  /* --- spacing ---------------------------------------------------- */
+  --space-1: 0.25rem;   /*  4px */
+  --space-2: 0.5rem;    /*  8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.5rem;    /* 24px */
+  --space-6: 2rem;      /* 32px */
+
+  /* viewport-relative board padding: the measured screen geometry */
+  --pad-l:  1.25vw;
+  --pad-r:  0.4vw;
+  --gutter: 1.9vw;
+
+  /* --- radius ------------------------------------------------------ */
+  --radius-sm:     2px;
+  --radius-md:     14px;
+  --radius-lg:     clamp(18px, 2.4vw, 26px);
+  --radius-pill:   999px;
+  --radius-circle: 50%;
+
+  /* --- effects ------------------------------------------------------ */
+  --blur-overlay:       blur(14px) saturate(120%);
+  --shadow-inset-edge:  inset 0 1px 0 rgba(255, 255, 255, .75);
+  --shadow-menu:        0 18px 40px rgba(0, 0, 0, .45);
+  --shadow-panel:       0 22px 50px rgba(0, 0, 0, .50);
+  --shadow-modal:       0 26px 60px rgba(0, 0, 0, .55);
+
+  /* --- motion -------------------------------------------------------- */
+  --transition-fast:   .14s ease;
+  --transition-normal: .2s ease;
+
+  /* --- layers -------------------------------------------------------- */
+  --z-board:   0;
+  --z-menu:    40;
+  --z-overlay: 50;
+
+  /* --- board geometry -------------------------------------------- */
+  /* --rows and --notice-h are written from App.jsx after measuring the
+     flexed board and any visible notice strip. */
+  --rows:  13;
+  --bar-h: clamp(42px, 9.3vh, 132px);
+  --row-h: calc((100dvh - var(--bar-h) - var(--notice-h, 0px)) / var(--rows));
+
+  /* Type fractions of the row height, read off the reference screen at
+     its own 13-row pitch. They were last calibrated against a board of
+     ten taller rows, where the same ratios rendered larger type; on the
+     reference pitch the text has to carry a bigger share of a shorter
+     row to read from across a concourse. Change the fraction, never a
+     pixel value. */
+  --f-time:  0.53;
+  --f-main:  0.52;   /* destination */
+  --f-via:   0.43;
+  --f-meta:  0.42;   /* train label and platform */
+  --f-badge: 0.55;
+
+  /* column tracks: mins keep text from colliding, the vw term holds
+     the measured geometry on anything desktop-sized */
+  /* The clock is the one cell whose content scales with --row-h inside a
+     track that used to be measured in vw, so a quiet board — fewer
+     departures than fitted rows, each one stretched — grew the time past
+     its track and into the badge, which fills the status column edge to
+     edge. The track now follows the type: it is the time plus one
+     --gutter of clearance (set on the cell), which is the very gap
+     `main` already leaves after the badge. So the two openings either
+     side of the status column are the same measure at every row height,
+     and the badge lands where the reference screen puts it. */
+  --col-time:   max-content;
+  --status-w:   15.5vw;
+  /* The status track follows the row pitch but never exceeds its measured
+     viewport share. This keeps sparse, taller rows from inflating the badge
+     through an em-based grid minimum. */
+  --badge-w:    min(var(--status-w), calc(var(--row-h) * 2.8));
+  --col-status: minmax(0, var(--badge-w));
+  --col-train:  minmax(2.2em, 7.4vw);
+  /* The platform column's width, named because the title bar's mark is
+     centred on the same measure: the B and the platform digit share one
+     vertical centre line. Change it here and both follow. */
+  --w-plat:     5vw;
+
+  /* The title bar's control metrics, named because the bar's grid has to
+     reserve the right-hand cluster's width on BOTH sides: two equal side
+     tracks are what keeps the title on the bar's centre line, so the
+     reservation has to be symmetric even though the left cluster is
+     narrower. --bar-h is a share of the viewport height, so on a tall,
+     narrow window the controls and the title grow while the width does
+     not — that is the case this reservation exists for. */
+  --control-size: clamp(26px, calc(var(--bar-h) * 0.50), 62px);
+  --control-gap:  clamp(8px, calc(var(--bar-h) * 0.22), 26px);
+  --topbar-side:  calc(2 * var(--control-size) + 2 * var(--control-gap));
+  --col-plat:   minmax(1.6em, var(--w-plat));
+
+  /* one column definition per screen type, reused by every row */
+  --grid-compact:
+    var(--col-time) var(--col-status) minmax(0, 1fr)
+    var(--col-train) var(--col-plat);
+  --grid-platform:
+    minmax(3.6em, 12.5vw) minmax(0, 1fr)
+    minmax(2.2em, 6.5vw) minmax(1.6em, 6.5vw);
+}
+
+/* =========================
+   Reset / Base
+   ========================= */
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+.sr-only{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0, 0, 0, 0);
+  white-space:nowrap;
+  border:0;
+}
+
+html,body{ height:100%; overflow:hidden; background:var(--color-board-bg); }
+
+body{
+  color:var(--color-board-text);
+  font-family:var(--font-family-primary);
+  font-weight:var(--font-weight-bold);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* React mounts inside #root: it must pass the screen height straight
+   through, so the board keeps deriving its geometry from the viewport. */
+#root{ height:100%; display:flex; flex-direction:column; }
+
+/* =========================
+   App Layout
+   ========================= */
+
+.screen{
+  min-height:100vh;
+  min-height:100dvh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  background:var(--color-board-bg);
+  overflow:hidden;
+  z-index:var(--z-board);
+}
+
+/* full-width message strip at the foot of the screen */
+.notice{
+  flex:0 0 auto;
+  padding:1.1vh var(--pad-l);
+  font-size:var(--font-size-notice);
+  line-height:1.2;
+  background:var(--color-alert-strong);
+  color:var(--color-board-text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.notice--info{ background:var(--color-destination); color:var(--color-board-bg); }
+
+/* Both strips sit in one measured box, so --notice-h still describes the
+   whole foot of the screen and fitRows() keeps its arithmetic. */
+.notice-stack{ flex:0 0 auto; }
+
+/* The active From -> To filter, announced in the board's own title-bar
+   blue: the same strip, not a card, and no colour the screen does not
+   already use. */
+.notice--route{
+  display:flex;
+  align-items:center;
+  gap:var(--gutter);
+  background:var(--color-topbar);
+  color:var(--color-board-text);
+}
+.notice__route{ overflow:hidden; text-overflow:ellipsis; }
+.notice__progress{
+  flex:1 1 auto;
+  min-width:0;
+  font-weight:var(--font-weight-regular);
+  opacity:.85;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.notice__clear{
+  flex:0 0 auto;
+  margin-left:auto;
+  display:grid;
+  place-items:center;
+  width:2em;
+  height:2em;
+  padding:0;
+  border:0;
+  border-radius:var(--radius-circle);
+  background:transparent;
+  color:currentColor;
+  cursor:pointer;
+  opacity:.85;
+  transition:opacity var(--transition-fast), background-color var(--transition-fast);
+}
+.notice__clear svg{
+  width:58%;
+  height:58%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+}
+.notice__clear:hover{ opacity:1; background:var(--color-control-hover); }
+.notice__clear:active{ opacity:1; background:var(--color-control-active); }
+.notice__clear:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
+  opacity:1;
+}
+
+/* =========================
+   Header
+   ========================= */
+
+.topbar{
+  flex:0 0 var(--bar-h);
+  background:var(--color-topbar);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  gap:0 2vw;
+  padding:0 var(--pad-r) 0 var(--pad-l);
+}
+/* Only the board's own bar, not the panels that reuse `.topbar` with a
+   single close button. Both side tracks carry the same floor, so they
+   stay equal to each other and the title keeps the bar's centre line;
+   the centre track may now fall below the title's width instead of
+   pushing the controls out of their track and under the title. */
+.screen > .topbar{
+  grid-template-columns:
+    minmax(var(--topbar-side), 1fr)
+    minmax(0, auto)
+    minmax(var(--topbar-side), 1fr);
+}
+.topbar-left{
+  display:flex;
+  /* centred on the clock, not sat on its baseline: the station name is
+     much smaller, so a shared baseline reads as bottom-heavy */
+  align-items:center;
+  min-width:0;
+}
+.topbar-clock{
+  font-size:var(--font-size-topbar-primary);
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.topbar-station{
+  /* the same opening the board leaves after its time column, so the
+     station name starts on the board's rhythm rather than its own */
+  margin-left:var(--gutter);
+  min-width:0;
+  font-size:var(--font-size-topbar-secondary);
+  font-weight:var(--font-weight-regular);
+  letter-spacing:.02em;
+  opacity:.92;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+/* The time of the data on the bar, in the right track before the search
+   control. It is secondary information in the station name's role, so it
+   takes that role's size and weight, and it gives up width before the
+   controls do — below 900px it leaves the bar entirely for the menu. */
+.topbar-updated{
+  margin-right:var(--gutter);
+  min-width:0;
+  overflow:hidden;
+  font-size:var(--font-size-topbar-secondary);
+  font-weight:var(--font-weight-regular);
+  letter-spacing:.02em;
+  opacity:.92;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.topbar-title{
+  font-size:var(--font-size-topbar-primary);
+  line-height:1;
+  text-align:center;
+  white-space:nowrap;
+  /* after the station name has given up all of its width, the title is
+     the only thing left to shorten: it ellipsises in place rather than
+     running under the controls */
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.topbar-right{
+  justify-self:end;
+  display:flex;
+  align-items:center;
+  gap:var(--control-gap);
+  /* so the updated text, and not the controls, absorbs a squeeze */
+  min-width:0;
+}
+
+/* --- header icon buttons (search, language, fullscreen) --------- */
+
+.topbar-pick{
+  display:grid;
+  place-items:center;
+  width:var(--control-size);
+  height:var(--control-size);
+  padding:0;
+  border:0;
+  border-radius:var(--radius-circle);
+  background:transparent;
+  color:var(--color-board-text);
+  cursor:pointer;
+  opacity:.85;
+  transition:opacity var(--transition-fast), background-color var(--transition-fast);
+}
+.topbar-pick svg{
+  width:62%;
+  height:62%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;   /* the fullscreen icon's corners */
+}
+.topbar-pick:hover{ opacity:1; background:var(--color-control-hover); }
+.topbar-pick:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
+  opacity:1;
+}
+.topbar-pick:active,
+.topbar-pick.is-on{ opacity:1; background:var(--color-control-active); }
+
+/* --- the title bar's menu ---------------------------------------- */
+/* Search is the only control left in the bar itself. Language,
+   fullscreen and About live one press behind the three dots beside it,
+   in a panel that opens downward out of the bar. It is the picker's
+   surface, radius and shadow — the same interaction layer, at menu
+   size — so nothing new is introduced for it. */
+
+.topbar-menuwrap{ display:flex; align-items:center; }
+
+/* the three dots are filled, not stroked like the other glyphs */
+.topbar-menu-btn svg circle{ fill:currentColor; stroke:none; }
+
+/* fixed, not absolute: .screen hides its overflow, which would clip a
+   menu hanging below the title bar. Header.jsx sets top/right from the
+   button's own box, so the menu lines up under the dots. */
+.topbar-menu{
+  position:fixed;
+  z-index:var(--z-menu);
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-1);
+  min-width:12em;
+  padding:var(--space-2);
+  border-radius:var(--radius-md);
+  border:1px solid var(--color-surface-line);
+  background:var(--surface-gradient);
+  box-shadow:var(--shadow-inset-edge), var(--shadow-menu);
+}
+
+/* the language row: four pills side by side under their own heading,
+   separated from the entries below by the surface's own hairline */
+.topbar-menu-group{
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-1);
+  padding-bottom:var(--space-2);
+  border-bottom:1px solid var(--color-surface-line);
+}
+.topbar-menu-label{
+  /* centred over the four pills it heads, which fill the menu's width */
+  text-align:center;
+  color:var(--color-surface-ink-muted);
+  font-size:var(--font-size-menu-item);
+  font-weight:var(--font-weight-regular);
+  line-height:1.6;
+  letter-spacing:.04em;
+}
+.topbar-menu-langs{ display:flex; gap:var(--space-1); }
+.topbar-menu-item{
+  padding:clamp(8px, 1.1vh, 12px) clamp(12px, 1.2vw, 18px);
+  border:0;
+  border-radius:var(--radius-pill);
+  background:transparent;
+  color:var(--color-surface-ink-muted);
+  font-family:inherit;
+  font-weight:var(--font-weight-bold);
+  font-size:var(--font-size-menu-item);
+  line-height:1;
+  letter-spacing:.04em;
+  text-align:left;
+  cursor:pointer;
+  transition:background-color var(--transition-fast), color var(--transition-fast);
+}
+.topbar-menu-item:hover{
+  background:var(--color-surface-hover);
+  color:var(--color-surface-ink);
+}
+.topbar-menu-item:active{ background:var(--color-surface-active); }
+.topbar-menu-item.is-on{
+  background:var(--color-topbar);
+  color:var(--color-board-text);
+}
+.topbar-menu-item:focus-visible{
+  outline:2px solid var(--color-topbar);
+  outline-offset:-2px;
+}
+/* the four language codes: equal pills, so no one of them reads as the
+   default by being wider than the others */
+.topbar-menu-item--lang{
+  flex:1 1 0;
+  padding-inline:clamp(8px, .9vw, 14px);
+  text-align:center;
+}
+/* fullscreen and About: an icon and a label on one line, the full width
+   of the menu, so the two read as entries rather than as pills */
+.topbar-menu-item--row{
+  display:flex;
+  align-items:center;
+  gap:var(--space-2);
+  border-radius:var(--radius-md);
+  white-space:nowrap;
+}
+/* What the bar dropped, restated at the foot of the menu: the station on
+   screen and the time of its data. Text, not entries — no hover, no
+   active state, no focus ring, nothing to press. Hidden while the bar
+   still carries both itself. */
+.topbar-menu-info{
+  display:none;
+  flex-direction:column;
+  gap:var(--space-2);
+  margin-top:var(--space-1);
+  padding-top:var(--space-2);
+  border-top:1px solid var(--color-surface-line);
+}
+.topbar-menu-fact{
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-1);
+  margin:0;
+  /* the menu entries' own inset, so label and value share their left
+     edge without being mistaken for one */
+  padding-inline:clamp(12px, 1.2vw, 18px);
+  font-size:var(--font-size-menu-item);
+  letter-spacing:.04em;
+}
+.topbar-menu-fact__label{
+  color:var(--color-surface-ink-muted);
+  font-weight:var(--font-weight-regular);
+  line-height:1.6;
+}
+.topbar-menu-fact__value{
+  color:var(--color-surface-ink);
+  font-weight:var(--font-weight-bold);
+  line-height:1.3;
+  /* a long station name wraps inside the menu rather than widening it */
+  overflow-wrap:anywhere;
+}
+.topbar-menu-icon{
+  flex:0 0 auto;
+  width:1.15em;
+  height:1.15em;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+/* =========================
+   Departure Board
+   ========================= */
+
+.departure-board{ flex:1 1 auto; min-height:0; overflow:hidden; }
+
+.departure-board__empty{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  padding:0 var(--pad-l);
+  text-align:center;
+  font-size:clamp(15px, calc(var(--row-h) * 0.9), 44px);
+}
+
+/* =========================
+   Departure Row — concourse overview (compact)
+   ========================= */
+/*
+   Measured on the reference screen (2048 x 976 board area, 13 rows):
+     row pitch 75.1px .............. 7.7% of the board
+     separator 1-2px white, inset 14px left and right (0.7vw)
+     time      x16,  cap 19px ...... 0.58 x row height
+     status    column x112-311, badges 0.80 x row height
+     dest      x335, cap 21px ...... primary yellow text
+     via       smaller, weight 400, white, inline after the dest
+     train     x1120, left aligned
+     platform  centred on x1247
+*/
+
+.layout-compact .departure-row{
+  height:var(--row-h);
+  display:grid;
+  grid-template-columns:var(--grid-compact);
+  align-items:center;
+  padding:0 var(--pad-r) 0 var(--pad-l);
+  position:relative;
+  font-size:clamp(14px, calc(var(--row-h) * var(--f-main)), 66px);
+  line-height:1.1;
+}
+/* separator: inset from both edges, as on the screen */
+.layout-compact .departure-row::after{
+  content:"";
+  position:absolute;
+  left:.7vw; right:.7vw; bottom:0;
+  border-bottom:1px solid var(--color-divider);
+}
+.layout-compact .departure-row:last-child::after{ border-bottom:0; }
+
+.layout-compact .departure-row__time{
+  font-size:clamp(13px, calc(var(--row-h) * var(--f-time)), 58px);
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+  /* the gap to the status column: the same measure `main` leaves on the
+     badge's other side, and what sizes the max-content track */
+  padding-right:var(--gutter);
+}
+.layout-compact .departure-row__status{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-width:0;
+}
+.layout-compact .departure-row__main{
+  min-width:0;
+  padding-left:var(--gutter);
+  padding-right:1.2em;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.layout-compact .departure-row__destination{ color:var(--color-destination); }
+.layout-compact .departure-row__via{
+  font-size:clamp(14px, calc(var(--row-h) * var(--f-via)), 58px);
+  font-weight:var(--font-weight-regular);
+}
+.layout-compact .departure-row__train{
+  font-size:var(--font-size-meta);
+  white-space:nowrap;
+}
+.layout-compact .departure-row__platform{
+  text-align:center;
+  font-size:var(--font-size-meta);
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+
+/* a stop the train no longer serves, struck through inside a list */
+.stop-dropped{
+  color:var(--color-board-text);
+  text-decoration:line-through;
+  text-decoration-color:var(--color-alert);
+}
+
+/* Badges fill the status column, as they do on the screen. The outer
+   corners are softly rounded — radius 0.06 x the badge height — and the
+   red half ends in a point that bites into the white half:
+   red base 44% of the width, tip reaching 52%; the tip follows badge
+   height until the responsive width cap has to keep it in proportion. */
+.badge{
+  --badge-h:calc(var(--row-h) * 0.80);
+  --tip:min(calc(var(--badge-h) * 0.52), calc(var(--badge-w) * 0.18));
+  display:flex;
+  align-items:stretch;
+  height:var(--badge-h);
+  width:100%;
+  position:relative;
+  /* Two caps, whichever is smaller: the measured fraction of the row
+     height, and what the responsive badge can actually hold.
+     The second is the binding one at every size (--badge-w never exceeds
+     2.8 x --row-h, so the row-height cap is always the looser of the
+     two), and it is what has to hold the widest split badge. Measured in
+     ems of this very size, with the stack's metric-compatible digits:
+       "+145'"  2.48   "16:52"  2.50
+       outer padding  2 x 0.50   the arrow's tip  1.26
+     = 7.24em in the worst corner, against a budget of exactly this
+     divisor. Seven left a three-digit delay ~0.24em over, and since the
+     halves carry min-width:max-content the surplus was clipped off the
+     revised time by the badge's own overflow. Raise the divisor — never
+     the column or the row — to give it back. */
+  font-size:min(clamp(12px, calc(var(--row-h) * var(--f-badge)), 60px),
+                calc(var(--badge-w) / 7.3));
+  line-height:1;
+  border-radius:calc(var(--badge-h) * 0.06);
+  overflow:hidden;
+}
+.badge > span{
+  flex:1 1 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+  padding:0 min(calc(var(--row-h) * 0.18), 0.5em);
+  white-space:nowrap;
+}
+.badge__alert{ background:var(--color-alert-strong); color:var(--color-board-text); }
+.badge__time{ background:var(--color-board-text); color:var(--color-board-bg); }
+/* when a new time follows the delay, the alert part ends in an arrow */
+.badge--split .badge__alert{
+  /* basis 0 keeps the measured 44/56 split whenever there is room;
+     min-width:max-content stops either half from starving when there
+     is not, so the text can never be cut off */
+  flex:46 1 0;
+  min-width:max-content;
+  position:relative;   /* the point must paint over the white half */
+  z-index:1;
+  padding-right:var(--tip);
+  clip-path:polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%,
+                    calc(100% - var(--tip)) 100%, 0 100%);
+  margin-right:calc(var(--tip) * -1);
+}
+.badge--split .badge__time{
+  flex:54 1 0;
+  min-width:max-content;
+  padding-left:var(--tip);
+}
+
+/* platform change: solid white box around the digit */
+.layout-compact .departure-row__platform .is-changed{
+  display:inline-block;
+  background:var(--color-board-text);
+  color:var(--color-topbar);
+  padding:0 calc(var(--row-h) * 0.16);
+}
+
+/* a value the source does not carry */
+.no-value{ opacity:var(--color-board-muted); }
+
+.layout-compact .departure-row.is-cancelled .departure-row__time,
+.layout-compact .departure-row.is-cancelled .departure-row__destination{
+  text-decoration:line-through;
+  text-decoration-thickness:.07em;
+}
+
+/* =========================
+   Departure Row — platform detail (tall bands)
+   ========================= */
+/*
+   Measured on the second reference screen:
+     row band 155px .............. 22% of the board (six bands at 1080p)
+     destination cap 0.16 x band, stop list underneath at 0.70 x dest
+     delay in a red arrow beneath the departure time
+*/
+
+.layout-platform{
+  --fs-platform-primary:clamp(15px, calc(var(--row-h) * 0.237), 62px);
+  --fs-dest:  var(--fs-platform-primary);
+  --fs-time:  var(--fs-platform-primary);
+  --fs-stops: clamp(11px, calc(var(--row-h) * 0.166), 42px);
+  --fs-train: clamp(15px, calc(var(--row-h) * 0.253), 64px);
+  --fs-plat:  var(--fs-platform-primary);
+  --fs-flag:  clamp(10px, calc(var(--row-h) * 0.150), 38px);
+}
+.layout-platform .departure-row{
+  height:var(--row-h);
+  display:grid;
+  grid-template-columns:var(--grid-platform);
+  align-items:start;
+  padding:calc(var(--row-h) * 0.065) 2vw 0 var(--pad-l);
+  border-bottom:2px solid var(--color-divider);
+  overflow:hidden;
+}
+.layout-platform .departure-row:last-child{ border-bottom:0; }
+
+.layout-platform .departure-row__clock{
+  font-size:var(--fs-time);
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.layout-platform .delay-flag{
+  display:inline-block;
+  margin-top:calc(var(--row-h) * 0.055);
+  padding:calc(var(--row-h) * 0.042) calc(var(--row-h) * 0.16)
+          calc(var(--row-h) * 0.042) calc(var(--row-h) * 0.055);
+  background:var(--color-alert-strong);
+  color:var(--color-board-text);
+  font-size:var(--fs-flag);
+  line-height:1.15;
+  letter-spacing:.06em;
+  white-space:nowrap;
+  clip-path:polygon(0 0, calc(100% - 0.75em) 0, 100% 50%, calc(100% - 0.75em) 100%, 0 100%);
+}
+.layout-platform .departure-row__destination{
+  font-size:var(--fs-dest);
+  line-height:1.02;
+  color:var(--color-destination);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.layout-platform .departure-row__stops{
+  margin-top:calc(var(--row-h) * 0.045);
+  font-size:var(--fs-stops);
+  font-weight:var(--font-weight-regular);
+  line-height:1.45;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:var(--stop-lines, 2);
+  line-clamp:var(--stop-lines, 2);
+  overflow:hidden;
+}
+.layout-platform .departure-row__train{
+  font-size:var(--fs-train);
+  line-height:1;
+  text-align:right;
+  white-space:nowrap;
+}
+.layout-platform .departure-row__platform{
+  text-align:right;
+  font-size:var(--fs-plat);
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.layout-platform .departure-row__platform .is-changed{
+  display:inline-block;
+  background:var(--color-board-text);
+  color:var(--color-topbar);
+  padding:calc(var(--row-h) * 0.035) calc(var(--row-h) * 0.07);
+  margin-right:calc(var(--row-h) * -0.03);
+}
+
+/* disruption band: wide and loud, never a small badge */
+.band{
+  display:flex;
+  align-items:center;
+  margin-top:calc(var(--row-h) * 0.05);
+  padding:calc(var(--row-h) * 0.035) calc(var(--row-h) * 0.09);
+  font-size:var(--fs-stops);
+  line-height:1.2;
+}
+.band--alert{ background:var(--color-alert-strong); color:var(--color-board-text); }
+.band--notice{ background:var(--color-destination); color:var(--color-board-bg); }
+
+.layout-platform .departure-row.is-cancelled .departure-row__clock,
+.layout-platform .departure-row.is-cancelled .departure-row__destination{
+  text-decoration:line-through;
+  text-decoration-thickness:.07em;
+}
+.layout-platform .departure-row.is-cancelled .departure-row__destination{ opacity:.75; }
+
+/* the word "Spoor"/"Voie": only the stacked phone layout prints it */
+.plat-label{ display:none; }
+
+/* =========================
+   Station Modal
+   ========================= */
+/* An interaction layer over the board, not part of the screen itself.
+   It is allowed to feel a little more modern than the board: darker,
+   softer, with a blurred backdrop. Its accents are the board's own
+   white and title-bar blue — no second accent colour is introduced.
+   Future overlays should reuse this surface, radius and shadow set. */
+
+.station-overlay,
+.train-overlay,
+.about-overlay{
+  position:fixed;
+  inset:0;
+  z-index:var(--z-overlay);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:6vh 5vw;
+  background:var(--color-overlay);
+  -webkit-backdrop-filter:var(--blur-overlay);
+  backdrop-filter:var(--blur-overlay);
+  animation:station-fade .18s ease-out;
+}
+@keyframes station-fade{ from{ opacity:0; } to{ opacity:1; } }
+
+/* The picker is a small panel inside the backdrop; the details overlay
+   is nearly the full screen, inset by one spacing step so it reads as a
+   panel over the board rather than a takeover of it. */
+.train-overlay{
+  padding:6vh var(--space-6);
+  /* the backdrop scrolls, not the panel: a panel that scrolled would
+     clip the hover tooltip rising out of the route section */
+  align-items:flex-start;
+  overflow-y:auto;
+}
+
+/* The horizontal text inset of the whole picker: the fields set it, and
+   the bar, labels, status and note align to the same edge from it. */
+.station-modal{
+  --station-field-inset:clamp(20px, 3.4vw, 40px);
+  width:min(680px, 100%);
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-3);
+  /* the board is fixed-height and hides overflow; the picker must not */
+  max-height:100%;
+  animation:station-rise .2s cubic-bezier(.2, .7, .3, 1);
+}
+@keyframes station-rise{
+  from{ opacity:0; transform:translateY(10px) scale(.985); }
+  to{ opacity:1; transform:none; }
+}
+
+/* --- the search pill -------------------------------------------- */
+
+.station-field{
+  position:relative;
+  display:flex;
+  align-items:center;
+  height:clamp(58px, 11vh, 92px);
+  padding:0 var(--station-field-inset);
+  border-radius:var(--radius-pill);
+  border:1px solid var(--color-surface-line);
+  background:var(--surface-gradient);
+  box-shadow:
+    var(--shadow-inset-edge),
+    inset 0 -1px 0 var(--color-surface-inset-edge),
+    var(--shadow-modal);
+  transition:border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+/* the soft focus glow — white, kept low and wide */
+.station-field:focus-within{
+  border-color:var(--color-surface-focus-border);
+  box-shadow:
+    var(--shadow-inset-edge),
+    inset 0 -1px 0 var(--color-surface-inset-edge),
+    0 0 0 2px var(--color-surface-focus-halo),
+    0 0 46px var(--color-surface-focus-glow),
+    var(--shadow-modal);
+}
+
+.station-input{
+  flex:1 1 auto;
+  min-width:0;
+  /* no default field chrome anywhere */
+  appearance:none;
+  background:none;
+  border:0;
+  outline:0;
+  color:var(--color-surface-ink);
+  font-family:inherit;
+  font-weight:var(--font-weight-regular);
+  font-size:var(--font-size-input);
+  line-height:1;
+  letter-spacing:.01em;
+  caret-color:var(--color-surface-ink);
+}
+.station-input::placeholder{ color:var(--color-surface-ink-muted); }
+
+.station-icon{
+  flex:0 0 auto;
+  width:clamp(19px, 2.4vw, 28px);
+  height:clamp(19px, 2.4vw, 28px);
+  margin-left:clamp(12px, 2vw, 22px);
+  fill:none;
+  stroke:var(--color-surface-icon);
+  stroke-width:2;
+  stroke-linecap:round;
+}
+
+/* --- suggestions -------------------------------------------------- */
+
+.station-results{
+  list-style:none;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:var(--space-2);
+  border-radius:var(--radius-lg);
+  border:1px solid var(--color-surface-line);
+  background:var(--surface-gradient);
+  box-shadow:var(--shadow-inset-edge), var(--shadow-panel);
+}
+.station-result{
+  position:relative;
+  padding:clamp(11px, 1.5vh, 16px) clamp(16px, 2.4vw, 26px);
+  border-radius:var(--radius-pill);
+  color:var(--color-surface-ink-muted);
+  font-weight:var(--font-weight-regular);
+  font-size:var(--font-size-suggestion);
+  line-height:1.25;
+  cursor:pointer;
+  transition:background-color var(--transition-fast), color var(--transition-fast);
+}
+.station-result:hover,
+.station-result.is-active{
+  background:var(--color-surface-active);
+  color:var(--color-surface-ink);
+}
+/* one accent for the whole picker: the board's title-bar blue */
+.station-result.is-active::before{
+  content:"";
+  position:absolute;
+  left:clamp(6px, .9vw, 10px);
+  top:50%;
+  width:3px;
+  height:1.05em;
+  transform:translateY(-50%);
+  border-radius:var(--radius-sm);
+  background:var(--color-topbar);
+}
+
+.station-status{
+  padding:0 var(--station-field-inset);
+  color:var(--color-picker-status-text);
+  font-weight:var(--font-weight-regular);
+  font-size:var(--font-size-secondary);
+}
+
+/* --- the two faces of the panel ---------------------------------- */
+/* The dialog is one panel with two contents: the picker, and the
+   From -> To form. Only the contents cross over — the panel itself never
+   moves, so the field the user was aiming at stays where it was. */
+
+.station-face{
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-3);
+  /* nested columns: without this the suggestion list refuses to shrink
+     and the panel grows past the backdrop on a short window */
+  min-height:0;
+}
+/* Each face leaves towards, and arrives from, its own side: the picker
+   to the left, the route form from the right. One custom property, so
+   the two keyframes below serve both directions. */
+.station-face--station{ --face-shift:-8px; }
+.station-face--route{ --face-shift:8px; }
+
+@keyframes station-face-in{
+  from{ opacity:0; transform:translateX(var(--face-shift)); }
+  to{ opacity:1; transform:none; }
+}
+@keyframes station-face-out{
+  from{ opacity:1; transform:none; }
+  to{ opacity:0; transform:translateX(var(--face-shift)); }
+}
+/* Not on the first face of an opening: the panel is already rising, and
+   two movements at once read as two separate things happening. */
+.station-face.is-entering{ animation:station-face-in var(--transition-normal) both; }
+/* after .is-entering, so a face on its way out wins */
+.station-face.is-leaving{ animation:station-face-out var(--transition-fast) both; }
+
+/* --- the second thing the search button can do -------------------- */
+/* Offered under the picker rather than asked about before it: the same
+   surface, radius and hairline as the suggestion list, so it reads as
+   the foot of one search panel and not as a tab or a second page. */
+
+.station-route-link{
+  display:flex;
+  align-items:center;
+  gap:clamp(12px, 1.6vw, 20px);
+  padding:clamp(11px, 1.5vh, 16px) clamp(16px, 2.4vw, 26px);
+  border-radius:var(--radius-lg);
+  border:1px solid var(--color-surface-line);
+  background:var(--surface-gradient);
+  box-shadow:var(--shadow-inset-edge), var(--shadow-panel);
+  color:var(--color-surface-ink-muted);
+  font-family:inherit;
+  text-align:left;
+  cursor:pointer;
+  transition:color var(--transition-fast), border-color var(--transition-fast);
+}
+.station-route-link:hover{
+  color:var(--color-surface-ink);
+  border-color:var(--color-surface-inset-edge);
+}
+.station-route-link:active{ color:var(--color-surface-ink); }
+.station-route-link:focus-visible{
+  color:var(--color-surface-ink);
+  outline:2px solid var(--color-topbar);
+  outline-offset:-2px;
+}
+.station-route-link__icon{
+  flex:0 0 auto;
+  width:clamp(19px, 2.4vw, 28px);
+  height:clamp(19px, 2.4vw, 28px);
+  fill:none;
+  stroke:var(--color-surface-icon);
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.station-route-link__text{ display:flex; flex-direction:column; gap:.15em; min-width:0; }
+.station-route-link__label{
+  font-weight:var(--font-weight-bold);
+  font-size:var(--font-size-suggestion);
+  line-height:1.2;
+}
+.station-route-link__hint{
+  color:var(--color-surface-ink-faint);
+  font-weight:var(--font-weight-regular);
+  font-size:var(--font-size-secondary);
+  line-height:1.3;
+}
+
+/* --- back to the picker ------------------------------------------- */
+
+/* One row the width of the fields below it, carrying the back control
+   alone. No inset of its own: the control's pill starts on the same edge
+   as the field pills underneath it. */
+.station-modal__bar{
+  display:flex;
+  align-items:center;
+  padding-inline:0;
+  color:var(--color-picker-status-text);
+}
+.station-back{
+  min-width:0;
+  display:inline-flex;
+  align-items:center;
+  gap:var(--space-1);
+  padding:var(--space-2) var(--space-3);
+  border:0;
+  border-radius:var(--radius-pill);
+  background:transparent;
+  color:var(--color-board-text);
+  font-family:inherit;
+  font-weight:var(--font-weight-bold);
+  font-size:var(--font-size-secondary);
+  line-height:1;
+  cursor:pointer;
+  opacity:.85;
+  transition:opacity var(--transition-fast), background-color var(--transition-fast);
+}
+.station-back__icon{
+  flex:0 1 auto;
+  width:1.1em;
+  height:1.1em;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.station-back:hover{ opacity:1; background:var(--color-control-hover); }
+.station-back:active{ opacity:1; background:var(--color-control-active); }
+.station-back:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
+  opacity:1;
+}
+
+/* --- From -> To -------------------------------------------------- */
+/* Two labelled fields on the picker's own surface. Deliberately quieter
+   than the single hero pill: this face is a form, not a search bar, so
+   the fields step down to the suggestion type size and the applied
+   action carries the board's blue. */
+
+/* One deliberate rhythm: the label hugs its own field, the groups are a
+   step apart, and the action takes the larger step before the note. */
+.station-face--route{ gap:var(--space-2); }
+.station-route__row{ display:flex; flex-direction:column; gap:var(--space-1); min-height:0; }
+.station-face--route .station-apply{ margin-top:var(--space-3); }
+.station-route__label{
+  padding:0 var(--station-field-inset);
+  color:var(--color-picker-status-text);
+  font-weight:var(--font-weight-regular);
+  font-size:var(--font-size-secondary);
+  letter-spacing:.04em;
+}
+.station-field--row{ height:clamp(48px, 7.4vh, 66px); }
+.station-field--row .station-input{ font-size:var(--font-size-suggestion); }
+/* a resolved station, not just typed text: the board's blue confirms it */
+.station-field--row.is-set{ border-color:var(--color-surface-focus-border); }
+.station-field--row.is-set .station-input{ font-weight:var(--font-weight-bold); }
+
+.station-apply{
+  padding:clamp(12px, 1.7vh, 18px) var(--space-5);
+  border:0;
+  border-radius:var(--radius-pill);
+  background:var(--color-topbar);
+  color:var(--color-board-text);
+  font-family:inherit;
+  font-weight:var(--font-weight-bold);
+  font-size:var(--font-size-suggestion);
+  line-height:1;
+  cursor:pointer;
+  box-shadow:var(--shadow-panel);
+  transition:opacity var(--transition-fast), background-color var(--transition-fast);
+}
+.station-apply:hover:enabled{ background:var(--color-surface-focus-border); opacity:.92; }
+.station-apply:active:enabled{ opacity:.85; }
+.station-apply:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
+}
+.station-apply:disabled{ opacity:.45; cursor:default; }
+
+.station-route__note{
+  padding:0 var(--station-field-inset);
+  color:var(--color-picker-status-text);
+  font-weight:var(--font-weight-regular);
+  font-size:var(--font-size-secondary);
+  text-align:center;
+}
+
+/* the board scrolls on phones — hold it still behind the overlay */
+body.modal-open{ overflow:hidden; }
+
+/* --- a row that opens the train details -------------------------- */
+/* Interactive, not redesigned: a pointer, a barely-there wash and the
+   standard focus ring. No card, no lift, no animation. */
+
+.departure-row.is-openable{ cursor:pointer; }
+.departure-row.is-openable:hover{ background:var(--color-control-hover); }
+.departure-row.is-openable:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:-3px;
+}
+
+/* =========================
+   Train Details
+   ========================= */
+/* One more SNCB screen, laid over the board — not a second design.
+   The panel is the board's own blue, the summary at the top is the
+   board's DepartureRow itself, and the timeline borrows the board's
+   white rules, yellow emphasis and red alert. The picker's backdrop,
+   radius and shadow are reused verbatim; nothing new is invented. */
+
+.train-details{
+  /* local geometry only: colours, spacing and radii all come from the
+     tokens above. --tip-space is the room the desktop tooltip needs,
+     reserved inside the scrollport so it is never clipped. */
+  --node:     clamp(11px, 1.05vw, 16px);
+  --stop-w:   clamp(7.5em, 10vw, 11em);
+  /* Room for the hover tooltip, which opens upward from a node. The
+     scrollport below clips, so the room has to exist inside it — but a
+     negative margin pulls it back out of the layout, so it costs no
+     height and the timeline still sits right under the row. Measured
+     against the tallest tooltip (name + three rows + a status flag). */
+  --tip-space:190px;
+
+  /* The overlay fits the row, never the other way round: it fills the
+     backdrop's inset box so the row keeps the board's own measurements
+     (--pad-l, the column tracks, --row-h) rather than being scaled to a
+     narrower panel. No frame of its own — the row's separator is the
+     boundary under it. Height follows the content; the max is a guard,
+     not a size. The corners are the tooltip's own radius, so the panel
+     and the popovers inside it round by the same amount. */
+  width:100%;
+  border-radius:var(--radius-md);
+  /* auto: the panel is exactly as tall as the row plus the route, and
+     the backdrop above scrolls if a short window cannot hold it. The
+     auto block margins centre it while it fits and collapse when it
+     does not, so the top stays reachable. */
+  margin-block:auto;
+  display:flex;
+  flex-direction:column;
+  background:var(--color-board-bg);
+  box-shadow:var(--shadow-modal);
+  animation:station-rise .2s cubic-bezier(.2, .7, .3, 1);
+}
+
+/* --- 1. the clicked departure ------------------------------------ */
+/* Literally a board row: the DepartureRow component, a direct child of
+   the panel, with no rule of its own here beyond not being allowed to
+   shrink. Every measurement it uses — --pad-l, --gutter, the column
+   tracks, --row-h and the type derived from it — is the viewport-based
+   token the board uses, so it renders at the board's exact geometry and
+   steps through the same breakpoints. Nothing modal-specific touches
+   it, and no overlay chrome sits inside its grid. */
+
+.train-details > .departure-row{ flex:0 0 auto; }
+/* On the board the separator is inset from the screen edges; inside the
+   panel it is the boundary between the row and the route, so it runs the
+   panel's full width instead of stopping short of it. */
+.train-details > .departure-row::after{ left:0; right:0; }
+
+/* The panel's title bar is the board's own `.topbar`, so the blue, the
+   height and the centred title need no second implementation. Only the
+   panel-specific bits live here: the rounded top edge it now needs, the
+   close control in the right-hand column, and the stacking that keeps it
+   above the timeline's reserved tooltip band. */
+.train-details__bar{
+  border-radius:var(--radius-md) var(--radius-md) 0 0;
+  padding-right:var(--space-4);
+  position:relative;
+  z-index:1;
+}
+/* The train's label in the bar's left track. `.topbar`'s two equal side
+   tracks already hold the title on the bar's centre line, so the label
+   needs no offset of its own — only a floor of zero and an ellipsis, so
+   a long label gives up width instead of reaching the title. It carries
+   the bar's own weight so it balances the close control opposite it, and
+   stays under the title by size alone: one line, bold, full white, the
+   in-between label size rather than the title's. */
+.train-details__label{
+  min-width:0;
+  font-size:var(--font-size-topbar-label);
+  font-weight:var(--font-weight-bold);
+  letter-spacing:.02em;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* The right-hand track holds the controls as a group and anchors the
+   info popover, which opens beneath them. */
+.train-details__controls{
+  justify-self:end;
+  display:flex;
+  align-items:center;
+  gap:var(--space-1);
+  position:relative;
+}
+
+/* the close glyph; the button's size, shape and states come from
+   `.topbar-pick`, exactly like the title bar's other controls */
+.train-close svg{
+  width:52%;
+  height:52%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.2;
+  stroke-linecap:round;
+}
+
+/* --- route unavailable / loading --------------------------------- */
+
+.train-details__message{
+  padding:var(--space-6) var(--pad-l);
+  font-size:var(--font-size-suggestion);
+  font-weight:var(--font-weight-regular);
+  line-height:1.4;
+}
+
+/* --- 2. the horizontal route timeline ---------------------------- */
+/* Short routes share the width evenly; long ones keep --stop-w per
+   stop and the container scrolls sideways. Labels are never squeezed
+   below a readable width, and the page itself never scrolls sideways. */
+
+.train-timeline{
+  flex:0 0 auto;
+  overflow-x:auto;
+  overflow-y:hidden;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+  /* The tooltip rises into this padding, which the scrollport would
+     otherwise clip. The negative margin takes that reserved band back
+     out of the flow, so it adds no height: together they leave the
+     intentional --space-5 visible gap below the summary row. Change the
+     reserve, padding and negative-margin formula together. */
+  padding:var(--tip-space) 0 var(--space-4);
+  margin-top:calc(var(--space-5) - var(--tip-space));
+}
+.train-timeline__track{
+  list-style:none;
+  display:flex;
+  align-items:flex-start;
+  /* The side breathing room belongs to the track, not the scrollport: a
+     scroll container drops its own padding-inline-end, leaving the last
+     station flush against the edge at the end of a long route. The track
+     also has to size to its content rather than being pinned to the
+     scrollport width, or the stops overflow past that padding instead of
+     carrying it with them. */
+  width:max-content;
+  min-width:100%;
+  padding-inline:var(--space-6);
+  /* Whatever width the stops cannot take — a three-stop route can only
+     grow so far — is slack, and slack belongs on both sides of the
+     route rather than all of it on the right. When the route overflows
+     there is no slack at all, so this behaves exactly like flex-start
+     and the scrollport still reaches the first stop. */
+  justify-content:center;
+}
+
+/* One stop, one column of the route, and the width of that column is
+   what sets the spacing between nodes — the line is drawn inside it, so
+   there is nothing between the columns to stretch.
+
+   Three bounds, all of them the label's own width:
+     min — --stop-w, the width a station label needs to read. Stops never
+           shrink below it (flex-shrink 0), so a long route overflows and
+           the section scrolls, as it always has;
+     preferred — a share of whatever the panel actually offers, which is
+           what flex-grow distributes;
+     max — twice --stop-w. Without a cap three stops would be flung to
+           opposite edges of the panel and their labels stranded from
+           their nodes; with it a short route widens to a comfortable
+           step and stops there. */
+.train-stop{
+  position:relative;
+  flex:1 0 var(--stop-w);
+  max-width:calc(var(--stop-w) * 2);
+  min-width:0;
+}
+
+/* The hit target is the whole column — time, node and name — not the
+   dot, so hovering or tapping anywhere on the stop activates it. */
+.train-stop__hit{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  width:100%;
+  padding:0;
+  appearance:none;
+  border:0;
+  background:none;
+  color:inherit;
+  font:inherit;
+  text-align:center;
+  cursor:pointer;
+}
+.train-stop__hit:focus-visible{ outline:2px solid var(--color-board-text); outline-offset:3px; }
+
+.train-stop__time{
+  font-size:clamp(12px, calc(var(--row-h) * 0.34), 30px);
+  line-height:1.2;
+  font-variant-numeric:tabular-nums;
+  margin-bottom:var(--space-2);
+}
+
+/* the connecting line: two halves, so the ends stop at the terminus */
+.train-stop__track{
+  position:relative;
+  display:block;
+  width:100%;
+  height:calc(var(--node) * 1.9);
+}
+.train-stop__track::before,
+.train-stop__track::after{
+  content:"";
+  position:absolute;
+  top:50%;
+  border-top:2px solid var(--color-divider);
+  opacity:.55;
+}
+.train-stop__track::before{ left:0; right:50%; }
+.train-stop__track::after{ left:50%; right:0; }
+.train-stop:first-child .train-stop__track::before,
+.train-stop:last-child .train-stop__track::after{ display:none; }
+
+.train-stop__node{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:var(--node);
+  height:var(--node);
+  transform:translate(-50%, -50%);
+  border-radius:var(--radius-circle);
+  background:var(--color-board-text);
+  /* over the connecting line, not under it: the line is drawn by the
+     track's ::after, which would otherwise paint across a filled node */
+  z-index:1;
+  transition:transform var(--transition-fast);
+}
+
+.train-stop__name{
+  margin-top:var(--space-2);
+  padding:0 var(--space-2);
+  font-size:clamp(11px, calc(var(--row-h) * 0.30), 26px);
+  line-height:1.2;
+  /* long names wrap once and then clip, so nothing ever overlaps */
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  line-clamp:2;
+  overflow:hidden;
+  overflow-wrap:anywhere;
+}
+
+/* --- stop states: the board's own semantics, no new colours ------ */
+
+/* first and last stop: a slightly larger node, nothing more */
+.train-stop.is-terminus .train-stop__node{ transform:translate(-50%, -50%) scale(1.25); }
+
+/* The station whose board is open: a solid node in the board's own
+   yellow, matching the label under it — one accent, not a new colour.
+   An extra stop keeps the hollow yellow ring, so the two stay distinct. */
+.train-stop.is-here .train-stop__node{
+  transform:translate(-50%, -50%) scale(1.45);
+  background:var(--color-destination);
+}
+/* and the line stops short of it on both sides, so the filled node reads
+   on its own instead of being threaded onto the route */
+.train-stop.is-here .train-stop__track::before{ right:calc(50% + var(--node)); }
+.train-stop.is-here .train-stop__track::after{ left:calc(50% + var(--node)); }
+.train-stop.is-here .train-stop__name{ color:var(--color-destination); }
+
+/* delayed and extra stops share the board's notice yellow */
+.train-stop.is-delayed .train-stop__time{ color:var(--color-destination); }
+.train-stop.is-extra .train-stop__node{
+  background:var(--color-board-bg);
+  border:3px solid var(--color-destination);
+}
+
+/* Cancellation follows the extra/current rules so its red fill and text win;
+   an extra cancelled stop intentionally keeps the earlier yellow border. */
+.train-stop.is-cancelled .train-stop__node{ background:var(--color-alert); }
+.train-stop.is-cancelled .train-stop__time,
+.train-stop.is-cancelled .train-stop__name{
+  color:var(--color-board-text);
+  text-decoration:line-through;
+  text-decoration-color:var(--color-alert);
+  text-decoration-thickness:.07em;
+}
+
+.train-stop:hover .train-stop__node{ transform:translate(-50%, -50%) scale(1.35); }
+.train-stop.is-here:hover .train-stop__node{ transform:translate(-50%, -50%) scale(1.55); }
+
+/* --- the detail itself ------------------------------------------- */
+/* One body, two placements — and two themes, carried by these variables
+   rather than by a second set of classes. The phone block
+   sits directly on the board, so it keeps the board's own colours;
+   the desktop tooltip is a lit panel floating over the screen, so it
+   borrows the station picker's surface exactly as the CSS rules ask
+   any overlay surface to. A delay is a delay wherever it is read, so
+   --tip-delay is the railway alert red on both placements; only its
+   surface-corrected shade differs, the light tooltip taking the variant
+   already darkened towards the board blue because the flat red is too
+   light on paper-white. The platform-change box likewise inverts with
+   the surface. */
+.train-details{
+  --tip-title:  var(--color-destination);
+  --tip-ink:    var(--color-board-text);
+  --tip-label:  var(--color-board-text);
+  --tip-line:   var(--color-divider);
+  --tip-delay:  var(--color-alert);
+  --tip-box-bg: var(--color-board-text);
+  --tip-box-ink:var(--color-topbar);
+}
+
+.train-tip{
+  /* the picker's surface: paper-white, board-blue ink */
+  --tip-title:  var(--color-surface-ink);
+  --tip-ink:    var(--color-surface-ink);
+  --tip-label:  var(--color-surface-ink-muted);
+  --tip-line:   var(--color-surface-line);
+  --tip-delay:  var(--color-alert-strong);
+  --tip-box-bg: var(--color-topbar);
+  --tip-box-ink:var(--color-board-text);
+
+  position:absolute;
+  left:50%;
+  bottom:calc(100% - var(--node) * 0.4);
+  z-index:1;
+  width:max-content;
+  min-width:13em;
+  max-width:19em;
+  transform:translate(-50%, -6px);
+  padding:var(--space-3) var(--space-4);
+  background:var(--surface-gradient);
+  color:var(--tip-ink);
+  border:1px solid var(--color-surface-line);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-inset-edge), var(--shadow-panel);
+  opacity:0;
+  visibility:hidden;
+  transition:opacity var(--transition-fast), transform var(--transition-fast),
+             visibility var(--transition-fast);
+}
+/* the tooltip is a child of the hover target, so moving onto it never
+   ends the hover — no flicker between the stop and its detail */
+.train-stop:hover .train-tip,
+.train-stop:focus-within .train-tip{
+  opacity:1;
+  visibility:visible;
+  transform:translate(-50%, -12px);
+}
+/* The scrollport clips sideways, so the end tooltips align to their own
+   edge instead of centring past it; the pointer follows the node. */
+.train-stop:first-child .train-tip{ left:0; transform:translate(0, -6px); }
+.train-stop:first-child:hover .train-tip,
+.train-stop:first-child:focus-within .train-tip{ transform:translate(0, -12px); }
+.train-stop:last-child .train-tip{ left:auto; right:0; transform:translate(0, -6px); }
+.train-stop:last-child:hover .train-tip,
+.train-stop:last-child:focus-within .train-tip{ transform:translate(0, -12px); }
+
+/* The pointer down to the node — on the stop, not on the tooltip, so it
+   is always at the stop's own centre, which is where the node is. The
+   tooltip's box moves (the end tooltips align to their edge rather than
+   centring past the scrollport), and a stop is not always --stop-w wide
+   any more, so a pointer measured from the tooltip would drift off the
+   node as the route widened. Measured from the stop, it cannot.
+   It rises with the tooltip and on the same easing, so the two read as
+   one surface; the vertical offset is the tooltip's own, less the
+   pointer's height, so their edges meet. */
+.train-stop::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:calc(100% - var(--node) * 0.4 - 8px);
+  z-index:2;
+  width:12px;
+  height:8px;
+  transform:translate(-50%, -6px);
+  /* the foot of the surface gradient, so the pointer matches its edge */
+  background:var(--color-surface-bottom);
+  clip-path:polygon(0 0, 100% 0, 50% 100%);
+  opacity:0;
+  visibility:hidden;
+  transition:opacity var(--transition-fast), transform var(--transition-fast),
+             visibility var(--transition-fast);
+}
+.train-stop:hover::after,
+.train-stop:focus-within::after{
+  opacity:1;
+  visibility:visible;
+  transform:translate(-50%, -12px);
+}
+
+.train-tip__name{
+  font-size:var(--font-size-secondary);
+  line-height:1.2;
+  color:var(--tip-title);
+  padding-bottom:var(--space-2);
+  border-bottom:1px solid var(--tip-line);
+  text-align:left;
+}
+.train-tip__list{ padding-top:var(--space-2); }
+.train-tip__row{
+  display:flex;
+  justify-content:space-between;
+  gap:var(--space-4);
+  padding:.15em 0;
+  font-size:var(--font-size-menu-item);
+  line-height:1.3;
+  text-align:left;
+}
+.train-tip__row dt{ font-weight:var(--font-weight-regular); color:var(--tip-label); }
+.train-tip__row dd{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+.train-tip__delay{ color:var(--tip-delay); }
+.train-tip__changed{
+  display:inline-block;
+  padding:0 .3em;
+  background:var(--tip-box-bg);
+  color:var(--tip-box-ink);
+}
+.train-tip__flag{
+  margin-top:var(--space-2);
+  padding:.25em .6em;
+  font-size:var(--font-size-menu-item);
+  line-height:1.2;
+  text-align:left;
+}
+.train-tip__flag--alert{ background:var(--color-alert-strong); color:var(--color-board-text); }
+.train-tip__flag--notice{ background:var(--color-destination); color:var(--color-board-bg); }
+
+/* --- 3. the reported passenger load ------------------------------ */
+/* Secondary to the route above it: one compact line of three figures and
+   a word, on the board's own blue, with no card, frame or separator of
+   its own. It is centred on the panel and sits in its own band of quiet:
+   the timeline's bottom padding plus --space-3 above it, --space-5 below,
+   so it reads as a deliberate second register rather than as something
+   left over at the foot of the route. Centring is the flex line's own
+   justification — no grid, no wrapper, no box.
+
+   The accent is scoped to this line and taken straight from the railway
+   palette — the board's white for a normal load, the notice yellow for
+   attention, the alert red at its highest. Only the figures take it: the
+   wording stays board-white, and it alone carries the meaning, so the
+   state survives with no colour perceived at all. */
+
+.train-occupancy{
+  /* The reading itself is unchanged — same palette, same figures, same
+     wording. Only its placement moved: it is now one half of the panel's
+     footer rather than a centred band of its own, so the spacing below
+     belongs to the footer and the line reads from the left edge like
+     everything else in that row. */
+  flex:0 1 auto;
+  --occupancy-accent:var(--color-board-text);
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:var(--space-1) var(--space-3);
+  font-size:var(--font-size-secondary);
+}
+.train-occupancy.is-medium{ --occupancy-accent:var(--color-destination); }
+.train-occupancy.is-high{   --occupancy-accent:var(--color-alert); }
+
+.train-occupancy__icons{
+  display:inline-flex;
+  align-items:center;
+  gap:var(--space-1);
+}
+.train-occupancy__figure{
+  width:1.35em;
+  height:1.35em;
+  fill:none;
+  stroke:var(--occupancy-accent);
+  stroke-width:1.6;
+  opacity:var(--color-board-muted);
+}
+.train-occupancy__figure.is-on{
+  fill:var(--occupancy-accent);
+  opacity:1;
+}
+
+
+/* =========================
+   About panel
+   ========================= */
+/* The details panel with prose in it: the picker's backdrop, the board's
+   blue surface, the board's own `.topbar` as its title bar and the same
+   rise-in. Only the body is new, and it is plain text on the board's
+   colours — no card, no second accent. */
+
+.about-panel{
+  width:min(840px, 100%);
+  margin-block:auto;
+  display:flex;
+  flex-direction:column;
+  border-radius:var(--radius-md);
+  background:var(--color-board-bg);
+  box-shadow:var(--shadow-modal);
+  animation:station-rise .2s cubic-bezier(.2, .7, .3, 1);
+}
+.about-panel__bar{
+  border-radius:var(--radius-md) var(--radius-md) 0 0;
+  padding-right:var(--space-4);
+}
+.about-panel__bar .train-close{ justify-self:end; }
+
+.about-panel__body{
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-4);
+  padding:clamp(20px, 3vw, 34px);
+  color:var(--color-board-text);
+  font-size:var(--font-size-suggestion);
+  line-height:1.5;
+}
+.about-panel__body p{ margin:0; }
+/* the first line says what the thing is, so it carries the board's
+   own emphasis weight */
+.about-panel__lead{ font-weight:var(--font-weight-bold); }
+/* the caveat is the quietest line on the panel, like the board's own
+   absent values */
+.about-panel__note{
+  font-size:var(--font-size-secondary);
+  opacity:var(--color-board-muted);
+}
+.about-panel__link{
+  color:var(--color-board-text);
+  text-underline-offset:.2em;
+  border-radius:var(--radius-sm);
+}
+.about-panel__link:hover{ color:var(--color-destination); }
+.about-panel__link:active{ opacity:.8; }
+.about-panel__link:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
+}
+
+/* =========================
+   Train Route Map (optional)
+   ========================= */
+/* The second view of the details panel, not a second design. The bar,
+   the button shapes and the surface colours are the ones the overlay
+   already uses; only the map canvas and the accuracy label are new.
+
+   These rules do ship in the board's stylesheet, because every style in
+   this project lives in this file — about 3 kB of it, 0.4 kB gzipped.
+   Leaflet's own 15 kB stylesheet does not: it is imported by the map
+   component, so Vite emits it as the map chunk's stylesheet and the
+   browser fetches it only when that chunk loads. The `.leaflet-*`
+   selectors below are theming overrides and are inert until then. */
+
+.train-map{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+/* The map sits directly under the departure row, so the row's separator
+   is the boundary above it, exactly as the timeline's was. */
+.train-map .train-details__message{ padding-top:var(--space-5); }
+
+/* The way back out of the map. It is a control of the panel's title
+   bar, not of the map, so it lives in that bar's left track opposite
+   the close button and the map below it carries no chrome at all.
+
+   It is a `.topbar-pick`, exactly like the info and close controls it
+   shares the bar with: the transparent ground, the .85 rest opacity,
+   the hover and active fills and the focus ring all come from there,
+   so the three controls read as one set. Only the box changes — this
+   one carries a word as well as a glyph, so the fixed circle relaxes
+   into a pill that hugs its content. */
+.train-map__back{
+  justify-self:start;
+  width:auto;
+  height:var(--control-size);
+  padding:0 var(--space-3);
+  border-radius:var(--radius-pill);
+  display:inline-flex;
+  align-items:center;
+  gap:var(--space-1);
+  font-family:inherit;
+  font-size:var(--font-size-topbar-secondary);
+  font-weight:var(--font-weight-bold);
+  line-height:1;
+}
+/* `.topbar-pick` sizes its glyph as a share of a fixed square box; this
+   box is as wide as its label, so the chevron is sized from the type
+   instead and keeps the other controls' optical weight. */
+.train-map__back svg{
+  width:1.15em;
+  height:1.15em;
+  stroke-width:2.2;
+}
+
+/* The one accuracy statement the map makes, folded behind an info
+   control in the panel's title bar so the map shows no disclaimer text
+   of its own. The line follows real railway geometry, but which of
+   several possible paths the train took is inferred, and the wording
+   inside must not suggest otherwise. */
+.train-info__panel{
+  position:absolute;
+  top:calc(100% + var(--space-2));
+  right:0;
+  z-index:2;
+  width:min(30ch, 78vw);
+  padding:var(--space-4);
+  border-radius:var(--radius-md);
+  background:var(--surface-gradient);
+  box-shadow:var(--shadow-menu), var(--shadow-inset-edge);
+  color:var(--color-surface-ink);
+  text-align:left;
+  animation:station-rise .16s cubic-bezier(.2, .7, .3, 1);
+}
+.train-info__title{
+  display:block;
+  margin-bottom:var(--space-1);
+  font-size:var(--font-size-secondary);
+  font-weight:var(--font-weight-bold);
+}
+.train-info__text{
+  font-size:var(--font-size-menu-item);
+  font-weight:var(--font-weight-regular);
+  line-height:1.45;
+  color:var(--color-surface-ink-muted);
+}
+/* the dot of the "i", drawn as a round cap on a zero-length line */
+.train-info svg line:last-of-type{ stroke-width:2.6; }
+
+/* Leaflet measures its container, so the canvas needs a real height at
+   every step rather than one fixed number. It is capped by viewport
+   height so a tall desktop window does not hand the map the whole
+   panel, and floored so a short one still shows a usable map. */
+.train-map__canvas{
+  flex:1 1 auto;
+  min-height:min(58vh, 520px);
+  background:var(--color-board-bg);
+  border-radius:0 0 var(--radius-md) var(--radius-md);
+  overflow:hidden;
+  /* Leaflet gives its own panes and controls z-indexes up to 800, and
+     `overflow` alone does not contain them. Without a stacking context
+     here those would outrank the title bar and paint over the info
+     popover that opens down across the map. */
+  isolation:isolate;
+}
+
+/* The base map is a light surface inside a dark panel, so its own
+   chrome is brought onto the overlay's design language rather than
+   left as Leaflet's default. Attribution keeps its contrast: it is a
+   licence condition, not decoration, and is never dimmed away. */
+.train-map__canvas .leaflet-container{
+  height:100%;
+  width:100%;
+  background:var(--color-surface-bottom);
+  font-family:var(--font-family-primary);
+}
+
+/* Attribution is a licence condition, so it keeps its contrast and its
+   link colour; only its box is tidied — the corner it sits in is the
+   canvas's own rounded one, so it is inset to match. */
+.train-map__canvas .leaflet-control-attribution{
+  margin:0;
+  padding:.2em .6em;
+  border-radius:var(--radius-sm) 0 0 0;
+  background:rgba(255, 255, 255, .86);
+  color:var(--color-surface-ink-muted);
+  font-size:11px;
+  line-height:1.6;
+}
+.train-map__canvas .leaflet-control-attribution a{ color:var(--color-topbar); }
+
+/* --- zoom controls ------------------------------------------------ */
+/* Leaflet's own buttons, kept entirely functional and brought onto the
+   overlay's surface: the picker's gradient, its line colour, the modal
+   radius and the panel shadow. The touch target stays at the 44px the
+   rest of the phone layout aims for. */
+.train-map__canvas .leaflet-control-zoom{
+  border:none;
+  border-radius:var(--radius-md);
+  overflow:hidden;
+  box-shadow:var(--shadow-menu), var(--shadow-inset-edge);
+}
+.train-map__canvas .leaflet-top .leaflet-control,
+.train-map__canvas .leaflet-bottom .leaflet-control{ margin:var(--space-3); }
+.train-map__canvas .leaflet-bar a{
+  width:36px;
+  height:36px;
+  line-height:36px;
+  background:var(--surface-gradient);
+  color:var(--color-surface-ink);
+  border-bottom-color:var(--color-surface-line);
+  font-family:var(--font-family-primary);
+  font-weight:var(--font-weight-bold);
+  transition:background var(--transition-fast), color var(--transition-fast);
+}
+.train-map__canvas .leaflet-bar a:hover{ background:var(--color-surface-top); }
+.train-map__canvas .leaflet-bar a:active{ background:var(--color-surface-bottom); }
+.train-map__canvas .leaflet-bar a.leaflet-disabled{
+  background:var(--surface-gradient);
+  color:var(--color-surface-ink-faint);
+}
+.train-map__canvas .leaflet-bar a:focus-visible{
+  outline:2px solid var(--color-topbar);
+  outline-offset:-2px;
+  z-index:1;
+}
+
+/* --- the stop popup ----------------------------------------------- */
+/* The timeline's stop tooltip, on the map. It carries the same markup
+   and so inherits the same rules; only the box Leaflet draws around it
+   is restated here, in the tooltip's own surface, radius and shadow.
+   The scoped --tip-* theme is the light-surface one, exactly as
+   `.train-tip` sets it, so a delay stays the railway alert red in its
+   surface-corrected shade and the platform-change box inverts with it. */
+.train-map__popup{
+  --tip-title:  var(--color-surface-ink);
+  --tip-ink:    var(--color-surface-ink);
+  --tip-label:  var(--color-surface-ink-muted);
+  --tip-line:   var(--color-surface-line);
+  --tip-delay:  var(--color-alert-strong);
+  --tip-box-bg: var(--color-topbar);
+  --tip-box-ink:var(--color-board-text);
+}
+.train-map__popup .leaflet-popup-content-wrapper{
+  padding:0;
+  background:var(--surface-gradient);
+  border:1px solid var(--color-surface-line);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-inset-edge), var(--shadow-panel);
+  color:var(--color-surface-ink);
+}
+.train-map__popup .leaflet-popup-content{
+  margin:0;
+  /* An even box, exactly as the timeline tooltip's is: the close control
+     does not carve a wider right margin out of the whole popup, so the
+     divider under the name still runs the full content width and the
+     rows below it stay symmetric. Only the name reserves room for it. */
+  padding:var(--space-3) var(--space-4);
+  font-size:var(--font-size-menu-item);
+  line-height:1.45;
+  color:var(--tip-ink);
+}
+/* the foot of the surface gradient, so the tip meets the box's edge —
+   the same relationship the timeline tooltip's pointer keeps */
+.train-map__popup .leaflet-popup-tip{
+  background:var(--color-surface-bottom);
+  box-shadow:none;
+}
+/* Leaflet's close button is a bare serif "x" pinned to the corner; this
+   is the panel's own quiet control instead, on the picker's hover fill,
+   and it sits inside the popup's own inset rather than on its edge. Its
+   box is inset by --space-2 so that the 24px target's optical centre
+   lands on the content's --space-4 / --space-3 corner — far enough in
+   not to float off the card, far enough off the border not to crowd it,
+   and on the name's own line, which keeps the title the anchor. */
+.train-map__popup .leaflet-popup-close-button{
+  top:var(--space-2);
+  right:var(--space-2);
+  width:24px;
+  height:24px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:var(--radius-circle);
+  font:var(--font-weight-bold) 16px/1 var(--font-family-primary);
+  color:var(--color-surface-icon);
+  transition:background var(--transition-fast), color var(--transition-fast);
+}
+.train-map__popup .leaflet-popup-close-button:hover{
+  background:var(--color-surface-hover);
+  color:var(--color-surface-ink);
+}
+.train-map__popup .leaflet-popup-close-button:active{ background:var(--color-surface-active); }
+.train-map__popup .leaflet-popup-close-button:focus-visible{
+  outline:2px solid var(--color-topbar);
+  outline-offset:1px;
+}
+/* The tooltip's own body rules apply unchanged; the name alone keeps
+   clear of the close control, so the title and its divider stay aligned
+   with everything below them. */
+.train-map__popup .train-tip__name{
+  font-size:var(--font-size-secondary);
+  padding-right:var(--space-5);
+}
+
+/* --- the panel's foot -------------------------------------------- */
+/* Closed off above by the same rule that divides the departure row from
+   the route: one divider colour, one weight, running the panel's full
+   width exactly as the row's separator does inside the panel.
+
+   The passenger load sits on the left and the way in to the map on the
+   right. On a narrow panel the two wrap onto separate lines and the
+   button keeps the right edge, so it never lands under the occupancy
+   figures. */
+.train-details__footer{
+  flex:0 0 auto;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:var(--space-2) var(--space-4);
+  padding:var(--space-4) var(--pad-l);
+  border-top:1px solid var(--color-divider);
+}
+.train-details__map-open{
+  /* Always the right edge, with or without an occupancy line beside it,
+     and still on the right when the two wrap onto separate lines. */
+  margin-left:auto;
+  display:inline-flex;
+  align-items:center;
+  gap:var(--space-2);
+  padding:var(--space-2) var(--space-4);
+  border:1px solid rgba(255, 255, 255, .28);
+  border-radius:var(--radius-pill);
+  background:transparent;
+  color:var(--color-board-text);
+  font-family:inherit;
+  font-size:var(--font-size-secondary);
+  font-weight:var(--font-weight-bold);
+  cursor:pointer;
+  transition:background var(--transition-fast), border-color var(--transition-fast);
+}
+.train-details__map-open svg{
+  width:1.15em;
+  height:1.15em;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linejoin:round;
+}
+.train-details__map-open:hover{ background:var(--color-control-hover); border-color:rgba(255, 255, 255, .5); }
+.train-details__map-open:active{ background:var(--color-control-active); }
+.train-details__map-open:focus-visible{
+  outline:2px solid var(--color-destination);
+  outline-offset:2px;
+}
+
+/* =========================
+   Responsive
+   ========================= */
+/* Four steps, and one guard for very short windows:
+     desktop      >= 1200px   the reference geometry above
+     laptop       <= 1199px   smaller type fractions, wider tracks
+     tablet       <= 899px    via list dropped, station name hidden
+     phone        <= 599px    each departure folded over several lines
+   Only the fractions and the tracks change — colours, hierarchy and
+   structure stay as they are. The phone step is kept in step with
+   STACKED_QUERY in App.jsx. */
+
+/* --- laptops and landscape tablets ------------------------------- */
+@media (max-width:1199px){
+  :root{
+    --f-time:0.51; --f-main:0.50; --f-via:0.42; --f-meta:0.40; --f-badge:0.52;
+    --status-w:17vw;
+    --col-train:minmax(2.2em, 8vw);
+    --w-plat:6vw;
+    --gutter:1.6vw;
+  }
+}
+
+/* --- portrait tablets and narrow windows ------------------------- */
+/* The inline "via" list is the first thing to go: it is the least
+   important column and the destination must stay dominant.          */
+@media (max-width:899px){
+  :root{
+    --f-time:0.46; --f-main:0.47; --f-via:0.40; --f-meta:0.39; --f-badge:0.45;
+    --status-w:18vw;
+    --col-train:minmax(2.2em, 10vw);
+    --w-plat:8vw;
+    --gutter:2vw;
+    --grid-platform:
+      minmax(3.6em, 16vw) minmax(0, 1fr)
+      minmax(2.2em, 9vw) minmax(1.6em, 8vw);
+  }
+  .layout-compact .departure-row__via{ display:none; }
+  .layout-platform{ --stop-lines:1; }
+  /* The bar keeps only clock, title, search and menu from here down;
+     the station name and the update time move into the menu's foot. */
+  .topbar-station{ display:none; }
+  .topbar-updated{ display:none; }
+  .topbar-menu-info{ display:flex; }
+  /* the menu now carries a wrapping station name, so it is allowed to
+     grow a little before that name folds */
+  .topbar-menu{ max-width:min(16em, calc(100vw - 2 * var(--pad-r))); }
+}
+
+/* --- phones: one train over several lines ------------------------ */
+/* Same board, same colours, same hierarchy — only the row is folded. */
+@media (max-width:599px){
+  /* The title bar's type is a fraction of --bar-h, so tightening the bar
+     tightens the clock and the title with it — no separate phone sizes. */
+  :root{
+    --bar-h:clamp(38px, 6.6vh, 58px);
+    --phone-edge:3vw;
+    /* the phone's own control metrics, so the side reservation that
+       keeps the title centred measures this bar and not the desktop one */
+    --control-size:clamp(38px, 10.2vw, 44px);
+    --control-gap:clamp(4px, 1.1vw, 12px);
+    /* a fixed track, so the content column starts at the same x on every
+       row regardless of how the time happens to measure */
+    --col-time:3.6em;
+    /* Semantic type roles within the phone row's em-based scale. */
+    --font-size-mobile-primary:1.3em;
+    --font-size-mobile-meta:1em;
+    --font-size-mobile-alert:.92em;
+    --font-size-mobile-secondary:.88em;
+  }
+  html,body{ height:auto; overflow-y:auto; overflow-x:hidden; }
+  #root{ height:auto; }
+  .screen{ height:auto; min-height:100dvh; overflow:visible; }
+  .departure-board{ overflow:visible; }
+  /* The empty-board line is board type on a desktop: a fraction of
+     --row-h, bold, centred in the height the rows are not using. A phone
+     has neither that row height nor the width for it — and as an
+     anonymous flex item the text could not wrap, so it ran off the
+     screen. It reads as one of the app's ordinary messages here instead,
+     in the role the details panel's "no route" line already uses. */
+  .departure-board__empty{
+    display:block;
+    height:auto;
+    padding:var(--space-6) var(--phone-edge);
+    font-size:var(--font-size-suggestion);
+    font-weight:var(--font-weight-regular);
+    line-height:1.4;
+  }
+  .topbar{ padding:0 var(--phone-edge); }
+  /* the right group carries search and the menu, so tighten its spacing
+     and trim the floors of the control sizes: at 360px the title would
+     otherwise run into the search icon */
+  /* width comes from --control-size above; the height is held at the
+     44px tap target the phone needs */
+  .topbar > .topbar-right .topbar-pick{ height:44px; }
+  .topbar > .topbar-right .topbar-pick svg{
+    width:clamp(15px, 4vw, 18px);
+    height:clamp(15px, 4vw, 18px);
+  }
+
+  .layout-compact .departure-row,
+  .layout-platform .departure-row{
+    height:auto;
+    /* reset the em base: on a phone the row no longer derives its
+       metrics from the (much larger) board row height */
+    font-size:clamp(13px, 3.6vw, 16px);
+    display:grid;
+    /* TIME | CONTENT. The time track is a fixed em width so every row
+       starts its content at the same x; the last two tracks are one
+       content column, which `main` spans and `meta` opens. */
+    grid-template-columns:var(--col-time) max-content minmax(0,1fr);
+    grid-template-areas:
+      "time main  main"
+      "time meta  plat"
+      "time status status";   /* platform layout simply leaves status empty */
+    align-items:baseline;
+    gap:.12em .55em;
+    padding:.45em var(--phone-edge);
+    border-bottom:0;
+    position:relative;
+  }
+  .layout-compact .departure-row::after,
+  .layout-platform .departure-row::after{
+    content:"";
+    position:absolute;
+    left:var(--phone-edge); right:var(--phone-edge); bottom:0;
+    border-bottom:1px solid var(--color-divider);
+  }
+  .layout-compact .departure-row:last-child::after,
+  .layout-platform .departure-row:last-child::after{ border-bottom:0; }
+
+  /* Match the desktop rules' two-class specificity, then let this later phone
+     block win by source order. */
+  .layout-compact .departure-row__time,
+  .layout-platform .departure-row__time{
+    grid-area:time;
+  }
+  .layout-compact .departure-row__time{
+    font-size:var(--font-size-mobile-primary);
+    line-height:1.15;
+    /* the fixed 3.6em track already spaces the content column: the
+       desktop clearance would only shift the time inside it */
+    padding-right:0;
+  }
+  /* Two-class, or the desktop rule's padding-left:var(--gutter) wins and
+     pushes the destination and via text ~9px right of the train label. */
+  .layout-compact .departure-row__main,
+  .layout-platform .departure-row__main{
+    grid-area:main;
+    min-width:0;
+    padding:0;
+    white-space:normal;
+  }
+  .layout-compact .departure-row__destination,
+  .layout-platform .departure-row__destination{
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    line-clamp:2;
+    font-size:var(--font-size-mobile-primary);
+    line-height:1.15;
+    /* long names wrap onto a second line rather than being cut, but never
+       onto a third: the row height stays predictable */
+    white-space:normal;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    overflow-wrap:anywhere;
+  }
+  .layout-compact .departure-row__via{
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    line-clamp:2;
+    overflow:hidden;
+    margin-top:.1em;
+    font-size:var(--font-size-mobile-secondary);
+    line-height:1.2;
+    white-space:normal;
+  }
+  .layout-platform .departure-row__stops{
+    -webkit-line-clamp:2;
+    line-clamp:2;
+    margin-top:.1em;
+    font-size:var(--font-size-mobile-secondary);
+    line-height:1.2;
+  }
+  .layout-compact .departure-row__train,
+  .layout-platform .departure-row__train{
+    grid-area:meta;
+    text-align:left;
+    font-size:var(--font-size-mobile-meta);
+    line-height:1.2;
+  }
+  .layout-compact .departure-row__platform,
+  .layout-platform .departure-row__platform{
+    grid-area:plat;
+    justify-self:start;
+    text-align:left;
+    font-size:var(--font-size-mobile-meta);
+    line-height:1.2;
+  }
+  .plat-label{
+    display:inline;
+    font-weight:var(--font-weight-regular);
+    opacity:.85;
+  }
+  .plat-label::before{ content:"· "; opacity:.7; }
+  .plat-label::after{ content:" "; }
+  .layout-compact .departure-row__platform .is-changed,
+  .layout-platform .departure-row__platform .is-changed{
+    padding:0 .3em;
+    margin:0;
+  }
+
+  .layout-compact .departure-row__status{ grid-area:status; justify-content:flex-start; }
+  /* rows without a badge must not reserve the status line */
+  .layout-compact .departure-row__status:empty{ display:none; }
+  .badge{
+    --badge-h:1.6em;
+    width:auto;
+    min-width:min(36vw, 10em);
+    font-size:var(--font-size-mobile-secondary);
+  }
+  .badge > span{ padding:0 .55em; }
+  .layout-platform .delay-flag{
+    margin-top:.2em;
+    font-size:var(--font-size-mobile-alert);
+  }
+  .band{
+    margin-top:.25em;
+    padding:.3em .6em;
+    font-size:var(--font-size-mobile-alert);
+  }
+
+  /* --- train details, on a phone --------------------------------- */
+  /* Nearly full screen, the same design language, and the stop detail
+     moves from a floating tooltip to a block under the timeline. */
+  /* The panel fills the phone's screen, as it always has: the backdrop
+     is never seen behind it. The route's slack is distributed inside
+     the panel, not taken out of its height. */
+  .train-overlay{ padding:0; align-items:stretch; overflow-y:auto; }
+  .train-details{
+    --node:12px;
+    --stop-w:7.2em;
+    --tip-space:0;
+    /* the vertical stop's three columns, named because two things now
+       use them: the stop row itself and the detail that opens under it,
+       which has to start at the name and carry the rail down past it */
+    --stop-time-w:4.2em;
+    --stop-rail-w:calc(var(--node) * 2.4);
+    --stop-col-gap:var(--space-2);
+    /* exactly the viewport: full-height shell, and a long route scrolls
+       in the route section rather than growing the panel. There is no
+       hover tooltip to clip at this size (--tip-space is 0), which is
+       why this panel may contain a scrollport and the desktop one may
+       not. */
+    min-height:100dvh;
+    max-height:100dvh;
+    min-width:0;
+    margin-block:0;
+    border-radius:0;
+  }
+  /* The title bar's own controls stay small; this one is the only way
+     out of a full-screen overlay, so it keeps a 44px tap target — and
+     the bar sizes to it rather than clipping it. */
+  .train-details__bar{ flex:0 0 auto; padding-block:var(--space-1); }
+  .train-details__bar .train-close{ width:44px; height:44px; }
+  /* The route turns vertical here, and only here: the same markup, the
+     same states and the same tooltip-less phone detail — re-laid out.
+     The stop becomes one row of the journey, `TIME | rail | NAME`, so
+     every name starts at one left edge and can wrap to two lines
+     without ever colliding with the one below it. Nothing scrolls
+     sideways any more; the panel's own vertical flow carries a long
+     route, exactly as it already carries the stop detail under it. */
+  .train-timeline{
+    /* The route is the panel's flexible middle: it takes whatever the
+       bar, the summary row, the stop detail and the foot leave, and no
+       more. Sideways scrolling is gone; a long route scrolls downward
+       inside this region instead, which keeps the foot in place. The
+       reserved tooltip band is gone too — the phone shows the detail in
+       a block below rather than a floating tip — so the padding here is
+       plain spacing. */
+    flex:1 1 auto;
+    min-height:0;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior-y:contain;
+    display:block;
+    padding:var(--space-4) 0;
+    margin-top:0;
+  }
+  /* Ordinary stacked content: the rows take the height their text needs
+     and nothing else. Spare room in the section falls below the last
+     stop, never between stops — the route keeps one rhythm whether it
+     has four calls or forty. */
+  .train-timeline__track{
+    display:block;
+    width:auto;
+    min-width:0;
+    padding-inline:var(--phone-edge);
+  }
+  .train-stop{
+    flex:none;
+    max-width:none;
+  }
+  /* the stop's three parts, side by side: a fixed time column, the
+     narrow rail, and the whole remaining width for the name */
+  .train-stop__hit{
+    /* One stable step between node centres, set by the row itself: the
+       smallest that stays readable at this type size. A wrapped
+       two-line name simply makes its own row taller — the rows are
+       never equalised to the tallest, and never stretched to fill. */
+    min-height:56px;
+    display:grid;
+    grid-template-columns:var(--stop-time-w) var(--stop-rail-w) minmax(0, 1fr);
+    align-items:stretch;
+    text-align:left;
+    column-gap:var(--stop-col-gap);
+  }
+  .train-stop__time{
+    font-size:14px;
+    margin-bottom:0;
+    padding-block:var(--space-3);
+    text-align:right;
+  }
+  .train-stop__name{
+    font-size:13px;
+    margin-top:0;
+    padding:var(--space-3) 0;
+    align-self:center;
+  }
+  /* The rail runs the full height of its row, so consecutive rows join
+     into one unbroken line; the row's height is set by the padding on
+     the text beside it, never by the rail itself. */
+  .train-stop__track{
+    width:auto;
+    height:auto;
+    align-self:stretch;
+  }
+  .train-stop__track::before,
+  .train-stop__track::after{
+    left:50%;
+    right:auto;
+    top:auto;
+    bottom:auto;
+    border-top:0;
+    border-left:2px solid var(--color-divider);
+    transform:translateX(-50%);
+  }
+  .train-stop__track::before{ top:0; bottom:50%; }
+  .train-stop__track::after{ top:50%; bottom:0; }
+  /* the current station's node still reads on its own, the line now
+     stopping short of it above and below instead of left and right */
+  .train-stop.is-here .train-stop__track::before{
+    right:auto;
+    bottom:calc(50% + var(--node));
+  }
+  .train-stop.is-here .train-stop__track::after{
+    left:50%;
+    top:calc(50% + var(--node));
+  }
+  /* --- the route map, on a phone --------------------------------- */
+  /* The panel is full-screen here, so the map takes the width to the
+     phone's own edge and the canvas keeps a real height instead of
+     collapsing inside a flex column. The bar stays above it and in
+     view, so "back" is always reachable. */
+  .train-map__back{ height:44px; padding-inline:var(--space-2); }
+  .train-map__canvas{
+    min-height:60vh;
+    border-radius:0;
+  }
+  /* Controls tuck into a tighter corner on a phone, and the zoom buttons
+     grow to the layout's own 44px touch target. */
+  .train-map__canvas .leaflet-top .leaflet-control,
+  .train-map__canvas .leaflet-bottom .leaflet-control{ margin:var(--space-2); }
+  .train-map__canvas .leaflet-bar a{ width:44px; height:44px; line-height:44px; }
+  /* the popup stays inside the phone's width, never widening the panel */
+  .train-map__popup .leaflet-popup-content{ max-width:min(72vw, 260px); }
+  /* the foot of a full-height panel: it lands at the bottom because the
+     route above it is the flexible section, not because it is pinned */
+  .train-details__footer{ padding:var(--space-4) var(--phone-edge); }
+  .train-details__map-open{ min-height:44px; }
+  /* the About panel folds the same way the details panel does */
+  .about-overlay{ padding:0; align-items:stretch; overflow-y:auto; }
+  .about-panel{
+    width:100%;
+    min-height:100dvh;
+    margin-block:0;
+    border-radius:0;
+  }
+  .about-panel__bar{ flex:0 0 auto; padding-block:var(--space-1); }
+  .about-panel__bar .train-close{ width:44px; height:44px; }
+
+  /* The footer around it owns the edge padding now; only the reading's
+     own type size is a phone concern. */
+  .train-occupancy{ font-size:15px; }
+
+  /* no hover on a phone: the detail opens inside the stop instead, so
+     neither the tooltip nor the pointer that belongs to it is drawn */
+  .train-tip,
+  .train-stop::after{ display:none; }
+  /* The tapped stop's detail, part of that stop and nothing else: it
+     starts where the station name starts, so it reads as a continuation
+     of the label above it rather than as a block of its own. No rule, no
+     surface, no second heading — the name is already in the row. The
+     stop simply grows, and everything below it moves down. */
+  .train-stop__detail{
+    position:relative;
+    /* Height is the content's alone: no min-height, no reserved band, no
+       viewport share. Two rows make a two-row expansion; a platform, a
+       delay or a status flag each add exactly their own line.
+       The trigger above keeps its 56px touch height, which leaves dead
+       slack under a one-line name; the negative top margin takes part of
+       that slack back so the detail reads as a continuation of the name
+       rather than a block floating under it. Only part of it: a name
+       that wraps to two lines has no slack to give, and this must not
+       close the gap on it. It never touches the node either, which is
+       still centred on the trigger's own height. */
+    margin-top:calc(var(--space-1) * -1);
+    padding:0 0 var(--space-3)
+      calc(var(--stop-time-w) + var(--stop-rail-w) + var(--stop-col-gap) * 2);
+    text-align:left;
+  }
+  /* and the rail comes with it: the stop's own line ends at the bottom
+     of its row, so the detail carries the same line down its full
+     height — however tall it becomes — to meet the next stop's. The
+     last stop still terminates the route, expanded or not. */
+  .train-stop__detail::before{
+    content:"";
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:calc(var(--stop-time-w) + var(--stop-col-gap) + var(--stop-rail-w) / 2);
+    border-left:2px solid var(--color-divider);
+    opacity:.55;
+    transform:translateX(-50%);
+  }
+  .train-stop:last-child .train-stop__detail::before{ display:none; }
+  /* Two columns, both as narrow as their content: the labels are single
+     words in every language, so the values sit just past the longest of
+     them instead of being flung to the far edge. The list is the grid
+     and each row hands its cells straight to it, so every value lines up
+     on one column without a fixed width anywhere. The label column may
+     shrink below its text — a long localised label wraps inside it and
+     the value stays on screen. */
+  .train-stop__detail .train-tip__list{
+    display:grid;
+    grid-template-columns:minmax(0, max-content) max-content;
+    column-gap:var(--space-4);
+    row-gap:var(--space-1);
+    padding-top:0;
+  }
+  .train-stop__detail .train-tip__row{
+    display:contents;
+    font-size:14px;
+  }
+  /* readable, but plainly second to the value beside it — the same
+     muted step the board uses for absent values */
+  .train-stop__detail .train-tip__row dt{ opacity:var(--color-board-muted); }
+  .train-stop__detail .train-tip__flag{
+    display:inline-block;
+    margin-top:var(--space-2);
+    font-size:13px;
+  }
+  /* the tapped stop is marked, since there is no hover to show it */
+  .train-stop__hit[aria-expanded="true"] .train-stop__name{ color:var(--color-destination); }
+
+  /* the picker, on a phone: closer to the top, larger tap targets */
+  .station-overlay{ padding:var(--space-4); align-items:flex-start; padding-top:12vh; }
+  .station-modal{ --station-field-inset:20px; }
+  .station-field{ height:56px; }
+  .station-input{ font-size:17px; }
+  .station-result{ padding:14px 18px; font-size:16px; }
+  /* roughly 44px of tap target for every control the picker adds */
+  .station-route-link{ padding:14px 18px; }
+  .station-route-link__label{ font-size:16px; }
+  .station-field--row{ height:48px; }
+  .station-apply{ padding-block:15px; }
+  /* The foot of the screen takes the same edge every other phone surface
+     takes: at --pad-l (1.25vw) the strip's text sat all but flush
+     against the screen, and the stack has to share one inset or the two
+     strips read as misaligned. */
+  .notice{ padding:var(--space-2) var(--phone-edge); }
+  /* The strip folds rather than dropping a line: the route and the clear
+     control keep the first row, and the progress note — "finding direct
+     departures", or the someUnchecked footnote once matches are on
+     screen — takes a quiet second one. It is the same element, so the
+     live region and its wording are unchanged; only its placement is a
+     phone concern. The stack is measured after paint, so --notice-h and
+     fitRows() follow the taller strip on their own. */
+  .notice--route{ gap:var(--space-2) var(--space-3); flex-wrap:wrap; }
+  /* The pair wraps onto a second line rather than being ellipsised away:
+     there is room for it here, and a shrinkable flex item is what keeps
+     a long one from pushing the clear control off the row. */
+  .notice__route{
+    flex:1 1 auto;
+    min-width:0;
+    white-space:normal;
+  }
+  .notice__progress{
+    /* ordered last, not written last: a full-width basis would otherwise
+       break the line before the clear control and leave it stranded */
+    order:1;
+    flex:1 0 100%;
+    white-space:normal;
+    font-size:.92em;
+  }
+}
+
+/* --- very short windows: trim the chrome before the data --------- */
+@media (max-height:560px) and (min-width:600px){
+  :root{ --bar-h:clamp(34px, 12vh, 70px); }
+  .layout-platform{ --stop-lines:1; }
+}
+
+/* =========================
+   Reduced motion
+   ========================= */
+
+@media (prefers-reduced-motion:reduce){
+  .station-overlay,
+  .train-overlay,
+  .about-overlay,
+  .station-modal,
+  .station-face,
+  .train-details,
+  .about-panel{ animation:none; }
+  .station-field,
+  .station-result,
+  .station-route-link,
+  .station-back,
+  .station-apply,
+  .notice__clear,
+  .topbar-pick,
+  .topbar-menu-item,
+  .train-stop__node,
+  .train-stop::after,
+  .train-tip{ transition:none; }
+}

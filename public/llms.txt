@@ -1,0 +1,38 @@
+# Belgian Train Departures
+
+An independent, non-commercial web application that shows live Belgian train
+departures in an interface styled after the departure boards installed in
+Belgian railway stations.
+
+It is not an official SNCB/NMBS product, and it is not affiliated with,
+endorsed by, or operated by SNCB/NMBS. The SNCB/NMBS names and trademarks
+remain the property of their respective owners.
+
+Live railway information is provided through the iRail API.
+
+## Capabilities
+
+- Live departure board for any Belgian station: times, destinations, delays,
+  platforms, platform changes, cancellations and service alerts.
+- Station search over real iRail station data, in all four languages.
+- Direct From -> To filtering: shows only departures whose own route calls at
+  the chosen destination, without a change of train.
+- Train Details: the full route of a train as a timeline, with per-stop times,
+  platforms, delays and occupancy where the operator reports it.
+- Optional route map drawn from preprocessed Infrabel open railway data, on
+  OpenStreetMap base tiles. The drawn route is approximate.
+- Multilingual interface: FR / NL / EN / DE.
+- Shareable station URLs, for example ?station=bruxelles-central and
+  ?station=bruxelles-central&to=leuven.
+
+## Accuracy
+
+Live railway information may occasionally be delayed, incomplete, inaccurate
+or temporarily unavailable. Nothing shown here is a guarantee of service.
+Official travel information should be checked with the relevant railway
+operator.
+
+## Links
+
+- iRail API documentation: https://docs.irail.be/
+- SNCB/NMBS (official travel information): https://www.belgiantrain.be/

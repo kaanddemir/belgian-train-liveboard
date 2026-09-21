@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Every board load waits on iRail, so the DNS/TCP/TLS handshake to it
+     starts here rather than when the first fetch is dispatched. This is a
+     connection hint only: it requests nothing, so the 400 ms scheduler in
+     src/services/irail.js still decides when any request actually goes
+     out. `crossorigin` matches the anonymous CORS fetches the service
+     makes — without it the warmed connection would not be reused. -->
+<link rel="preconnect" href="https://api.irail.be" crossorigin>
+
+<title>Belgian Train Departures</title>
+<meta name="description" content="Live Belgian train departures on a station-style board: real-time departures, delays and platforms, direct From → To filtering and full route details, powered by iRail.">
+<!-- The board's own surface colour (--color-board-bg), so the browser
+     chrome matches the screen it frames. -->
+<meta name="theme-color" content="#0f3054">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+
+<!-- Social metadata is deliberately static. Link-preview crawlers do not
+     run JavaScript, so they only ever see this file; rewriting these tags
+     per station at runtime would change nothing for them. The document
+     title is the one thing that does follow the station, in App.jsx.
+     og:url, og:image and twitter:image are absolute-URL tags and wait for
+     a production domain. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Belgian Train Departures">
+<meta property="og:title" content="Belgian Train Departures">
+<meta property="og:description" content="Live Belgian train departures on a station-style board: real-time departures, delays and platforms, direct From → To filtering and full route details, powered by iRail.">
+<meta property="og:locale" content="en_GB">
+<meta property="og:locale:alternate" content="fr_BE">
+<meta property="og:locale:alternate" content="nl_BE">
+<meta property="og:locale:alternate" content="de_BE">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Belgian Train Departures">
+<meta name="twitter:description" content="Live Belgian train departures on a station-style board: real-time departures, delays and platforms, direct From → To filtering and full route details, powered by iRail.">
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
