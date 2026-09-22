@@ -28,7 +28,7 @@ const DEFAULT_STATION = { id: STATION, name: '', standardname: '' };
 const STATION_PARAM = 'station';
 
 // The browser tab's name; the resolved station is prefixed to it.
-const DOCUMENT_TITLE = 'Belgian Train Departures';
+const DOCUMENT_TITLE = 'Belgian Train Liveboard';
 
 // The second parameter the board owns, and only while the From -> To
 // filter is on: the readable slug of the destination the listed trains
@@ -173,7 +173,7 @@ const TEXT = {
     about: 'Over dit bord',
     stationLabel: 'Station',
     updated: 'Laatst bijgewerkt',
-    aboutWhat: 'Belgian Train Departures is een onafhankelijk project om Belgische treinvertrekken te bekijken in een interface naar het voorbeeld van een stationsbord.',
+    aboutWhat: 'Belgian Train Liveboard is een onafhankelijk project om Belgische treinvertrekken te bekijken in een interface naar het voorbeeld van een stationsbord.',
     aboutFeatures: 'Het brengt live vertrekken, treindetails, routekaarten en historische stiptheid samen op één plek.',
     aboutData: 'Live spoorweggegevens komen van de',
     aboutIRail: 'iRail API',
@@ -278,7 +278,7 @@ const TEXT = {
     about: 'À propos',
     stationLabel: 'Gare',
     updated: 'Dernière mise à jour',
-    aboutWhat: 'Belgian Train Departures est un projet indépendant pour consulter les départs des trains belges dans une interface inspirée des tableaux de gare.',
+    aboutWhat: 'Belgian Train Liveboard est un projet indépendant pour consulter les départs des trains belges dans une interface inspirée des tableaux de gare.',
     aboutFeatures: 'Il réunit en un seul endroit les départs en temps réel, les détails des trains, les cartes de parcours et la ponctualité historique.',
     aboutData: 'Les données ferroviaires en temps réel proviennent de',
     aboutIRail: 'l’API iRail',
@@ -383,7 +383,7 @@ const TEXT = {
     about: 'About',
     stationLabel: 'Station',
     updated: 'Last updated',
-    aboutWhat: 'Belgian Train Departures is an independent project for viewing Belgian train departures in a station-board-inspired interface.',
+    aboutWhat: 'Belgian Train Liveboard is an independent project for viewing Belgian train departures in a station-board-inspired interface.',
     aboutFeatures: 'It brings together live departures, Train Details, route maps and historical punctuality insights in one place.',
     aboutData: 'Live railway data is provided through the',
     aboutIRail: 'iRail API',
@@ -488,7 +488,7 @@ const TEXT = {
     about: 'Über diese Tafel',
     stationLabel: 'Bahnhof',
     updated: 'Zuletzt aktualisiert',
-    aboutWhat: 'Belgian Train Departures ist ein unabhängiges Projekt, das belgische Zugabfahrten in einer an Bahnhofstafeln angelehnten Oberfläche zeigt.',
+    aboutWhat: 'Belgian Train Liveboard ist ein unabhängiges Projekt, das belgische Zugabfahrten in einer an Bahnhofstafeln angelehnten Oberfläche zeigt.',
     aboutFeatures: 'Es vereint Live-Abfahrten, Zugdetails, Streckenkarten und historische Pünktlichkeit an einem Ort.',
     aboutData: 'Live-Bahndaten stammen aus der',
     aboutIRail: 'iRail API',

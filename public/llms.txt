@@ -1,4 +1,4 @@
-# Belgian Train Departures
+# Belgian Train Liveboard
 
 An independent, non-commercial web application that shows live Belgian train
 departures in an interface styled after the departure boards installed in
