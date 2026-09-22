@@ -19,10 +19,10 @@
    Nothing is loaded until a reader opens a train's details. The board
    itself fetches none of this.
 
-   Every failure resolves to null. A 404, a broken file, a train we
-   have no history for and a station this train does not call at are
-   all the same answer to the panel — render nothing — and none of them
-   may ever surface as an error in the details overlay.
+   Every failure resolves to `none`. A 404, a broken file and a train
+   or station that cannot form a lookup are all the same answer to the
+   panel — no Performance button — and none of them may ever surface as
+   an error in the details overlay.
    ------------------------------------------------------------------ */
 
 // Below these the figure is not published, and the build script has
@@ -158,9 +158,10 @@ function daysSince(day) {
 
 /* --- public API ---------------------------------------------------
 
-   How this train has run at this station, as one of four answers. The
-   section always renders, so this never returns null for "nothing to
-   say" — it says which nothing it is:
+   How this train has run at this station, as one of four answers. This
+   never returns null for "nothing to say" — it says which nothing it
+   is, and hasPerformance() below decides which of them the panel
+   offers a way into:
 
      none        no usable dataset for this train at all: no shard, a
                  broken file, or a header its own dates contradict
@@ -172,9 +173,9 @@ function daysSince(day) {
                  figures — when the train has enough journeys in it —
                  were computed from that window's days and no others
 
-   A fifth state, `loading`, belongs to the panel rather than here: it
-   is what there is to show before either of the two calls below has an
-   answer, and it is deliberately not one of these.
+   Loading belongs to the panel rather than here: before either call
+   below has an answer there is no button yet, and it is deliberately
+   not one of these states.
 
    `trainNumber` is the board's own normalised label half, already on
    the departure. `stationKey` is the board station's performance key —

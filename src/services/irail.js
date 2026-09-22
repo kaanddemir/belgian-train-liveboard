@@ -308,12 +308,16 @@ export async function getLiveboard(station, lang = 'nl', signal, mode = 'departu
     arrdep: arrival ? 'arrival' : 'departure', alerts: 'true', lang,
   }, { priority: 'high', signal });
   const raw = asArray(arrival ? json?.arrivals?.arrival : json?.departures?.departure);
+  // The board's own station, carried on every row: a /vehicle answer is
+  // only accepted once it is shown to call here at the row's time.
+  const stationId = json?.stationinfo?.id || (isStationId(station) ? station : '');
   return {
     station: stationName(json?.stationinfo, json?.station, lang) || station,
     alerts: extractAlerts(json),
     departures: raw
       .map((d, index) => normalizeDeparture(d, lang, index, arrival))
       .filter(Boolean)
+      .map((t) => ({ ...t, stationId }))
       .filter((t) => !t.left)
       .sort((a, b) => a.time - b.time),
   };
@@ -333,6 +337,8 @@ export async function getLiveboard(station, lang = 'nl', signal, mode = 'departu
 // evicted so a later queued call can retry them.
 const stopsCache = new Map();
 const stopsMeta = new Map();
+const resolvedCache = new Map();
+const resolvedMeta = new Map();
 const sliceCache = new Map();
 const sliceMeta = new Map();
 const MAX_JOURNEYS = 256;
@@ -352,6 +358,42 @@ function serviceDay(date) {
   const requestDate = `${parts.day}${parts.month}${parts.year.slice(-2)}`;
   const number = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)) / 86_400_000;
   return { key, requestDate, number };
+}
+
+// iRail's `date` is the day the train left its origin, not the day of
+// the row: a train that sets off at 23:42 and calls here at 00:05 is
+// yesterday's service, and asking for today returns *tomorrow's* run of
+// the same number with a 200. Before this Brussels hour a row may belong
+// to yesterday's service, so it is the one place a second day is tried.
+const SERVICE_DAY_ROLLOVER_HOUR = 4;
+
+const brusselsHourFormat = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/Brussels', hour: '2-digit', hourCycle: 'h23',
+});
+
+// The calendar day before a service day. Pure date arithmetic on the day
+// number, so a DST night (23 or 25 hours long) cannot skip or repeat a
+// day the way subtracting 24 hours from a timestamp would.
+function previousServiceDay(service) {
+  const day = new Date((service.number - 1) * 86_400_000);
+  const year = String(day.getUTCFullYear());
+  const month = String(day.getUTCMonth() + 1).padStart(2, '0');
+  const date = String(day.getUTCDate()).padStart(2, '0');
+  return {
+    key: `${year}-${month}-${date}`,
+    requestDate: `${date}${month}${year.slice(-2)}`,
+    number: service.number - 1,
+  };
+}
+
+// Whether a journey is the run the row describes: it calls at the
+// board's station at exactly the row's scheduled time. The train number
+// repeats every day, so the number alone proves nothing.
+function callsAt(stops, stationId, time) {
+  if (!stops || !stationId) return false;
+  const at = time.getTime();
+  return stops.some((s) => s.id === stationId
+    && [s.time, s.departure, s.arrival].some((t) => t && t.getTime() === at));
 }
 
 function pruneCompleted(cache, meta, max) {
@@ -431,8 +473,10 @@ function normalizeStop(s, lang) {
   };
 }
 
-function getJourney(vehicleId, day, lang) {
-  const service = serviceDay(day);
+// One /vehicle answer for one service day, exactly as iRail gave it:
+// deduplicated and cached per train, day and language whether or not it
+// turns out to be the run a row wanted.
+function fetchJourney(vehicleId, service, lang) {
   const key = `${vehicleId}|${service.key}|${lang}`;
   if (!stopsCache.has(key)) {
     let journey;
@@ -450,6 +494,34 @@ function getJourney(vehicleId, day, lang) {
     cachePromise(stopsCache, stopsMeta, key, journey, service.number, MAX_JOURNEYS);
   }
   return stopsCache.get(key);
+}
+
+// The journey one board row is about: the row's own Brussels day first,
+// accepted only if it calls at this station at the row's scheduled time.
+// An early-morning row that does not validate (or has no journey) tries
+// the day before once, through the same queue; nothing else does. Either
+// way an unvalidated journey is never returned — null means unavailable.
+// Cached per row, so the via list, the filter and the details overlay
+// resolve the day once between them.
+function getJourney(vehicleId, stationId, time, lang) {
+  const service = serviceDay(time);
+  const key = `${vehicleId}|${stationId}|${time.getTime()}|${lang}`;
+  if (!resolvedCache.has(key)) {
+    let journey;
+    journey = fetchJourney(vehicleId, service, lang)
+      .then((stops) => {
+        if (callsAt(stops, stationId, time)) return stops;
+        if (Number(brusselsHourFormat.format(time)) >= SERVICE_DAY_ROLLOVER_HOUR) return null;
+        return fetchJourney(vehicleId, previousServiceDay(service), lang)
+          .then((earlier) => (callsAt(earlier, stationId, time) ? earlier : null));
+      })
+      .catch((err) => {
+        evictPromise(resolvedCache, resolvedMeta, key, journey);
+        throw err;
+      });
+    cachePromise(resolvedCache, resolvedMeta, key, journey, service.number, MAX_SLICES);
+  }
+  return resolvedCache.get(key);
 }
 
 // What the board and the route filter learn about one train, as three
@@ -478,14 +550,14 @@ const FAILED = { status: 'failed', stops: null };
 // as the journey: the board compares stop lists by identity on every
 // 30 s refresh, and a fresh array each time would re-render for nothing.
 // The two constants above are shared for the same reason.
-export function getStops(vehicleId, afterTime, lang = 'nl', direction = 'after') {
+export function getStops(vehicleId, stationId, afterTime, lang = 'nl', direction = 'after') {
   if (!vehicleId) return Promise.resolve(UNAVAILABLE);
   const service = serviceDay(afterTime);
   const before = direction === 'before';
-  const key = `${vehicleId}|${afterTime.getTime()}|${lang}${before ? '|before' : ''}`;
+  const key = `${vehicleId}|${stationId}|${afterTime.getTime()}|${lang}${before ? '|before' : ''}`;
   if (!sliceCache.has(key)) {
     let slice;
-    slice = getJourney(vehicleId, afterTime, lang)
+    slice = getJourney(vehicleId, stationId, afterTime, lang)
       .then((stops) => (stops
         ? {
           status: 'ok',
@@ -508,9 +580,9 @@ export function getStops(vehicleId, afterTime, lang = 'nl', direction = 'after')
 // The complete journey, first stop to terminus, for the details overlay.
 // Same cache entry and same queue as getStops: opening the overlay on a
 // train the board has already listed costs no request at all.
-export function getRoute(vehicleId, dayTime, lang = 'nl') {
+export function getRoute(vehicleId, stationId, dayTime, lang = 'nl') {
   if (!vehicleId) return Promise.resolve(null);
-  return getJourney(vehicleId, dayTime, lang)
+  return getJourney(vehicleId, stationId, dayTime, lang)
     .then((stops) => (stops?.length ? stops : null))
     .catch(() => null);
 }

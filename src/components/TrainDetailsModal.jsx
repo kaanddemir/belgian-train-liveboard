@@ -202,9 +202,8 @@ function Metric({ label, value, hint }) {
 }
 
 function TrainPerformance({ performance, t, id }) {
-  // No result yet means the shard is still in flight. The section is
-  // drawn from the moment the panel opens either way, so nothing below
-  // it moves when the figures arrive.
+  // The footer only opens this once hasPerformance() has a result, so
+  // the loading fallback is a guard rather than a state a reader sees.
   const state = performance?.state ?? 'loading';
   const meta = performance ? metaLine(performance, t) : null;
   // Which sentence stands in for the figures, when there are none.

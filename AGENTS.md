@@ -61,26 +61,29 @@ the same class names; the CSS differs per layout prefix.
 src/main.jsx                    React entry point; mounts <App> and imports styles.css.
 src/App.jsx                     CONFIG block, translations (TEXT), app state, the 30 s
                                 refresh loop, row-count fitting, the notice strip.
-src/components/Header.jsx       Title bar: Brussels clock, station name, search button,
+src/components/Header.jsx       Title bar: Brussels clock, station name (a second way
+                                into the picker, plain text in kiosk), search button,
                                 menu (language, fullscreen, last update, About).
 src/components/DepartureBoard.jsx  Maps departures to rows; renders the empty state.
 src/components/DepartureRow.jsx Both row layouts, the delay badge, disruption bands,
                                 platform cell and inline stop lists.
 src/components/StationModal.jsx Search overlay, two faces in one dialog: the station
                                 picker (input, keyboard navigation, suggestion
-                                list), which is always what an opening shows,
-                                and the From -> To route filter form it swaps
-                                to in place.
+                                list, nearest-station location button), which is
+                                always what an opening shows, and the From -> To
+                                route filter form it swaps to in place.
 src/components/TrainDetailsModal.jsx  Train details overlay: the train's service label in
                                 the bar, the clicked row redrawn by DepartureRow, the
                                 route timeline (horizontal on desktop/tablet, vertical
-                                on a phone), stop details, occupancy, and the lazy
+                                on a phone), stop details, occupancy, the footer
+                                actions (Performance, Open map), and the lazy
                                 import of the map view.
 src/components/AboutModal.jsx   The informational panel, two faces picked by `kind`:
                                 About (short plain-language summary) and Legal &
                                 Disclaimer (six short sections), all of it from TEXT.
 src/services/irail.js           All iRail communication, response normalisation,
-                                caching and the station search/ranking algorithm.
+                                caching, the station search/ranking algorithm and
+                                nearestStation().
 src/services/mockBoard.js       Development-only fixture board behind `?mock=1`.
                                 Never imported by a production build.
 src/components/TrainRouteMap.jsx  The optional route map. Lazy-loaded; the only
@@ -361,6 +364,15 @@ scripts/data/build-rail-network.mjs
 - Preserve successful and in-flight journey deduplication. Cache genuine
   unavailable journeys gracefully, evict transient failures so they can retry,
   and keep completed journey caches bounded for long-running sessions.
+- `/vehicle`'s `date` is the train's service day (the day it left its
+  origin), not the row's day: asking a 00:05 row's own date for a train
+  that set off at 23:42 returns *tomorrow's* run with a 200. So a journey
+  is accepted only if it calls at the row's `stationId` at the row's exact
+  scheduled time (`callsAt()`). The row's Brussels date is tried first;
+  only a row before `SERVICE_DAY_ROLLOVER_HOUR` that does not validate
+  tries the previous day, once, through the scheduler. Never probe other
+  dates, never use an unvalidated journey, and never probe around an
+  ordinary daytime 404.
 - Cache and request dates for `/vehicle` must come from the same Brussels date.
   A vehicle request must time out so it cannot block the serialized queue;
   timeouts remain transient and retryable. Do not redesign that queue without evidence.
@@ -453,16 +465,24 @@ thing on the board. Everything else is live iRail.
 
   Do not add Average Delay, a cancellation rate, a reliability score or
   a fourth row.
-- **The section always renders**, from the moment the panel opens.
-  When there is nothing to say it says which nothing it is, and the five
-  states are never run together: `loading` (the shard is in flight),
-  `none` (no usable dataset), `collecting` (fresh but no window yet),
-  `stale` (the newest day is too old) and `ok` (a window qualified,
-  which may still be short of comparable journeys for this train).
+- **The footer action is offered only when it leads somewhere**, like
+  Open map. `hasPerformance()` in `punctuality.js` is the one rule, read
+  from the evaluated state and never from UI text: the Performance
+  button shows for `ok` with at least one observation (figures, or a
+  real but thin sample), `collecting` and `stale`. It is absent while
+  the shard is in flight, and for `none` (no lookup key, no shard, a
+  broken or untrusted file) or an `ok` window that has never seen this
+  train here. No placeholder, no reserved space; with nothing to carry,
+  occupancy included, the footer is not drawn. The section opens only
+  behind the button and closes when another train is opened.
+- The states are never run together: `none` (no usable dataset),
+  `collecting` (fresh but no window yet), `stale` (the newest day is too
+  old) and `ok` (a window qualified, which may still be short of
+  comparable journeys for this train). Loading belongs to the panel.
 - A shard already fetched this session is read synchronously with
   `peekPerformance()` during render, so a second train in the same
-  hundred shows its figures in the first frame instead of blinking
-  through the loading state. It starts no request and changes no cache.
+  hundred offers its button in the first frame instead of waiting a
+  tick. It starts no request and changes no cache.
 - **The window adapts.** The build picks the largest trailing window the
   state genuinely covers and names it: 30 days (≥27 covered), else 15
   (≥14), else 10 (all 10). Below that nothing is named and the panel
@@ -521,12 +541,15 @@ thing on the board. Everything else is live iRail.
   Train Details opens, and is memoised for the session.
 - Performance is **independent of the route**. It is keyed on the train
   number and the board's station, so it must not wait for `/vehicle`
-  and must still render for a train that has no journey. Only the map
-  waits for a route.
-- Every failure resolves to `null`: a 404, a broken file, an unknown
-  train, a station this train does not call at, or an aggregate more
-  than seven days stale. Performance must never surface an error in the
-  overlay, and must never break the row, the timeline or the map.
+  and must still be offered for a train that has no journey. Each
+  footer action waits only for its own data: Performance for its shard,
+  Open map for the route. Never gate the footer as a whole on route
+  loading.
+- Every failure resolves to `none`, and so to no button: a 404, a broken
+  file, an untrusted header, an unusable train number or an empty
+  station key. An aggregate more than seven days old is `stale`, which
+  is still offered and says so. Performance must never surface an error
+  in the overlay, and must never break the row, the timeline or the map.
 - Below `n = 10` the panel names the sample and says the data is
   insufficient. Rows collapse rather than showing a placeholder or a
   dash. Never pad the section back to three rows.
@@ -756,6 +779,12 @@ favoriteStationSlugs  up to 5 station slugs, in the order they were starred
   like any other slug, so an unresolvable entry is simply not offered.
   A sixth favourite is refused; the five in hand are never replaced.
 - Never persist railway data: no board, no journeys, no API cache.
+- Never persist or send the user's position. The picker's nearest-station
+  button reads it once per press with `navigator.geolocation`, never on
+  load, and only to pick from the `/stations` list already in hand
+  (`nearestStation()`, using each station's iRail `locationX`/`locationY`).
+  It adds no request. A denial or failure is a localized status line
+  under the field, and typing clears it.
 - Every storage access is wrapped in try/catch. Private windows and
   blocked site data must fall back to the defaults without an error.
 
@@ -834,8 +863,9 @@ Before considering a change complete:
 10. No new dependencies were introduced.
 11. No new CSS colours, breakpoints or one-off magic numbers outside the
     token system.
-12. Performance still degrades to nothing on a 404, a malformed shard, an
-    unknown train, an unknown station or a stale aggregate, and Train
-    Details keeps working in every one of those cases.
+12. Performance still degrades to no button on a 404, a malformed shard,
+    an unknown train or an unknown station, a stale aggregate is still
+    offered and says so, and Train Details keeps working in every one of
+    those cases. The button never waits for the route.
 13. The board still fetches no Performance shard; only opening a train
     does, and a second train in the same hundred reuses it.

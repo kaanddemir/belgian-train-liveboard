@@ -245,6 +245,44 @@ body{
   text-overflow:ellipsis;
 }
 .notice--info{ background:var(--color-destination); color:var(--color-board-bg); }
+/* A notice the reader can dismiss takes the rows' own column tracks, the
+   way the missing-departure line does: the text spans up to the platform
+   column and the X sits centred in it, under the platform numbers. The
+   X borrows its box from the strip's padding so the strip keeps its
+   height. */
+.notice--dismissible{
+  display:flex;
+  align-items:center;
+  gap:var(--gutter);
+}
+.notice__text{
+  flex:1 1 auto;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+/* sized from the strip's own type, as on the missing-departure line */
+.notice--dismissible .notice__clear{
+  font-size:inherit;
+  margin-block:-.3em;
+  width:1.6em;
+  height:1.6em;
+}
+.layout-compact .notice--dismissible{
+  display:grid;
+  grid-template-columns:var(--grid-compact);
+  gap:0;
+  padding-right:var(--pad-r);
+}
+.layout-compact .notice--dismissible .notice__text{ grid-column:1 / -2; }
+.layout-compact .notice--dismissible .notice__clear{
+  grid-column:-2;
+  justify-self:center;
+  margin-left:0;
+}
+.notice--info .notice__clear:hover{ background:var(--color-surface-hover); }
+.notice--info .notice__clear:active{ background:var(--color-surface-active); }
+.notice--info .notice__clear:focus-visible{ outline-color:var(--color-board-bg); }
 
 /* Both strips sit in one measured box, so --notice-h still describes the
    whole foot of the screen and fitRows() keeps its arithmetic. */
@@ -2648,6 +2686,13 @@ body.modal-open{ overflow:hidden; }
   .departure-board__notice-text{ white-space:normal; }
   .layout-compact .departure-board__notice{ display:flex; }
   .layout-compact .departure-board__notice .notice__clear{ margin-left:auto; }
+  /* The phone row has no platform column to line up with: the dismissible
+     strip folds back to text and X, the text wrapping rather than running
+     under the control, and the X keeps a thumb-sized target. */
+  .layout-compact .notice--dismissible{ display:flex; gap:var(--space-2); padding-right:var(--space-1); }
+  .notice--dismissible .notice__text{ white-space:normal; }
+  .layout-compact .notice--dismissible .notice__clear{ margin-left:auto; }
+  .notice--dismissible .notice__clear{ width:44px; height:44px; margin-block:-12px; }
   .departure-board__notice ~ .departure-board__empty{ height:auto; }
   .departure-board__empty{
     display:block;

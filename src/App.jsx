@@ -245,6 +245,7 @@ const TEXT = {
     unknownStation: (s) => `Onbekend station “${s}”`,
     details: 'Treindetails',
     close: 'Sluiten',
+    dismissWarning: 'Melding sluiten',
     share: 'Delen',
     shareCopied: 'Link gekopieerd',
     shareFailed: 'Kon de link niet kopiëren. Kopieer hem hieronder:',
@@ -367,6 +368,7 @@ const TEXT = {
     unknownStation: (s) => `Gare inconnue « ${s} »`,
     details: 'Détails du train',
     close: 'Fermer',
+    dismissWarning: 'Masquer l’avertissement',
     share: 'Partager',
     shareCopied: 'Lien copié',
     shareFailed: 'Impossible de copier le lien. Copiez-le ci-dessous :',
@@ -489,6 +491,7 @@ const TEXT = {
     unknownStation: (s) => `Unknown station “${s}”`,
     details: 'Train details',
     close: 'Close',
+    dismissWarning: 'Dismiss warning',
     share: 'Share',
     shareCopied: 'Link copied',
     shareFailed: 'Could not copy the link. Copy it below:',
@@ -611,6 +614,7 @@ const TEXT = {
     unknownStation: (s) => `Unbekannter Bahnhof „${s}“`,
     details: 'Zugdetails',
     close: 'Schließen',
+    dismissWarning: 'Hinweis schließen',
     share: 'Teilen',
     shareCopied: 'Link kopiert',
     shareFailed: 'Link konnte nicht kopiert werden. Bitte unten kopieren:',
@@ -949,8 +953,23 @@ export default function App() {
     // station list — a slug that matches nothing is ignored, silently,
     // because the user never typed it.
     const remembered = slugs.station ? null : findStationBySlug(list, openedWith.current);
-    setStation(slugs.station ? (found || DEFAULT_STATION) : (remembered || DEFAULT_STATION));
-    setUnknownSlug(!slugs.station || found ? '' : slugs.station);
+    const unknown = slugs.station && !found ? slugs.station : '';
+    // An unknown slug falls back to the default station, and the address
+    // bar is corrected in place to the station actually on screen — no new
+    // history entry. The notice keeps the slug as it was typed.
+    const fallback = unknown
+      ? list.find((s) => s.id === DEFAULT_STATION.id) || DEFAULT_STATION
+      : DEFAULT_STATION;
+    setStation(slugs.station ? (found || fallback) : (remembered || DEFAULT_STATION));
+    if (unknown && fallback.standardname) {
+      const url = new URL(window.location.href);
+      url.searchParams.set(STATION_PARAM, stationToSlug(fallback));
+      window.history.replaceState(window.history.state, '', url);
+    }
+    // A language switch re-reads the now-corrected URL; that is not a new
+    // navigation, so it neither clears the notice nor brings back one the
+    // reader dismissed.
+    setUnknownSlug((prev) => (unknown || (withLink ? '' : prev)));
     // A `to=` that names no real station is simply not a filter: the board
     // falls back to every departure rather than to an invented one.
     setDestination(slugs.to ? findStationBySlug(list, slugs.to) || null : null);
@@ -1157,7 +1176,7 @@ export default function App() {
       const result = MOCK
         ? mockResult((await mockSource()).getMockStops(d.vehicleId, d.time,
           d.arrival ? 'before' : 'after'))
-        : await getStops(d.vehicleId, d.time, lang, d.arrival ? 'before' : 'after');
+        : await getStops(d.vehicleId, d.stationId, d.time, lang, d.arrival ? 'before' : 'after');
       // The station, the language or the board moved on while this was in
       // the queue: the answer is still cached for whoever wants it next,
       // but it must not reach a board it no longer describes.
@@ -1311,7 +1330,7 @@ export default function App() {
     setRouteLoading(true);
     const journey = MOCK
       ? mockSource().then((m) => m.getMockRoute(selectedDeparture.vehicleId, stationRef.current))
-      : getRoute(selectedDeparture.vehicleId, selectedDeparture.time, lang);
+      : getRoute(selectedDeparture.vehicleId, selectedDeparture.stationId, selectedDeparture.time, lang);
     journey
       .then((stops) => { if (!cancelled) { setRoute(stops); setRouteLoading(false); } });
     return () => { cancelled = true; };
@@ -1419,6 +1438,17 @@ export default function App() {
 
   /* --- bottom strip: only present when there is something to say -- */
 
+  // The unknown-station notice's X goes away with it, so focus lands where the missing-departure
+  // notice sends it: the first train, else the search control.
+  const dismissUnknownSlug = useCallback(() => {
+    setUnknownSlug('');
+    requestAnimationFrame(() => {
+      const screen = screenRef.current;
+      (screen?.querySelector('.departure-row.is-openable')
+        || screen?.querySelector('.topbar-pick'))?.focus();
+    });
+  }, []);
+
   let notice = null;
   if (error && board) {
     const mins = Math.round((Date.now() - lastGood.current) / 60000);
@@ -1426,7 +1456,7 @@ export default function App() {
   } else if (error) {
     notice = { text: t.offline, kind: 'alert' };
   } else if (unknownSlug) {
-    notice = { text: t.unknownStation(unknownSlug), kind: 'info' };
+    notice = { text: t.unknownStation(unknownSlug), kind: 'info', dismiss: dismissUnknownSlug };
   } else if (board?.alerts.length) {
     notice = { text: board.alerts[0], kind: 'info' };
   }
@@ -1702,8 +1732,25 @@ export default function App() {
             </div>
           )}
           {notice && (
-            <div className={`notice${notice.kind === 'info' ? ' notice--info' : ''}`}>
-              {notice.text}
+            <div
+              className={`notice${notice.kind === 'info' ? ' notice--info' : ''}`
+                + (notice.dismiss ? ' notice--dismissible' : '')}
+            >
+              {notice.dismiss ? <span className="notice__text">{notice.text}</span> : notice.text}
+              {notice.dismiss && (
+                <button
+                  type="button"
+                  className="notice__clear"
+                  onClick={notice.dismiss}
+                  aria-label={t.dismissWarning}
+                  title={t.dismissWarning}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                  </svg>
+                </button>
+              )}
             </div>
           )}
         </div>

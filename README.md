@@ -8,10 +8,14 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
 
 - Live station departures, refreshed every 30 seconds
 - Real-time delays, platforms, platform changes, cancellations, extra services, route changes, and service notices when supplied by iRail
-- Search across Belgian stations using live iRail station data
+- Live arrivals on the same board, switched from the board title
+- Search across Belgian stations using live iRail station data, opened from the search button or the station name
+- Nearest station from your location, on request only
+- Up to five favourite stations
 - Direct From → To filtering based on each train's actual onward stops
 - Train Details with a full route timeline, stop times, platforms, delays, and reported occupancy
 - Historical Performance for the opened train at the station on screen: Typical Delay, On-Time Rate, and 90% Arrive Within, over the most recent window the collected data covers
+- Kiosk mode for unattended displays
 - Optional interactive route map with pan, pinch, and zoom controls
 - Dutch, French, English, and German interfaces
 - Responsive desktop, tablet, and phone layouts
@@ -192,9 +196,9 @@ Below ten observations the panel names the sample and says the data is insuffici
 
 Note that the thresholds count observations inside the *selected* window, and reaching ten needs ten covered days — which is why the shortest window demands all of them.
 
-The section is always present, from the moment the panel opens — it shows a loading line while its shard is fetched, and a shard already in hand renders without one. When no window qualifies it shows `Collecting history · N days available`; when the dataset is more than a week out of date it says so; when a train has never been seen at the station it says there is no history yet. It never shows a figure it cannot stand behind, and it never disappears.
+The **Performance** button in the Train Details footer appears once the shard has answered with something to say about this train, independently of the route and of the **Open map** button. It is offered when there are figures, a real but thin sample (the panel names the count and says it is not enough yet), `Collecting history · N days available`, or a dataset more than a week out of date (the panel says so). When there is no usable history at all — no shard, a broken file, a train number or station that cannot form a lookup, or a train never seen at this station in the window — the button is simply not shown. It never shows a figure it cannot stand behind.
 
-The browser never contacts Infrabel, never downloads a CSV and never computes a statistic. It lazily fetches one small static shard — `generated/performance/<trainNumber / 100>.json` — when Train Details is opened, and memoizes it for the session. The board itself fetches nothing. Every failure resolves to nothing rendered: Performance can never break Train Details, the timeline or the map.
+The browser never contacts Infrabel, never downloads a CSV and never computes a statistic. It lazily fetches one small static shard — `generated/performance/<trainNumber / 100>.json` — when Train Details is opened, and memoizes it for the session. The board itself fetches nothing. Every failure resolves to no Performance button: Performance can never break Train Details, the timeline or the map.
 
 Ingestion runs entirely in the background, in `.github/workflows/punctuality.yml`, three times a day. Because Infrabel overwrites its D-1 dataset every morning, a missed day is repaired from the monthly file rather than lost.
 
@@ -218,7 +222,7 @@ The application has no user accounts, authentication, analytics, tracking, or co
 - `preferredLanguage` — the last language selected
 - `favoriteStationSlugs` — up to 5 favourite station slugs
 
-Departure boards, train journeys, destination filters, and API caches are not persisted. Requests for railway data go directly from the browser to iRail; opening the optional map also requests the local rail graph and OpenStreetMap tiles.
+Departure boards, train journeys, destination filters, and API caches are not persisted. Your location is read only when you press the nearest-station button, used in the browser to pick from the station list, and never stored or sent anywhere. Requests for railway data go directly from the browser to iRail; opening the optional map also requests the local rail graph and OpenStreetMap tiles.
 
 ## Disclaimer
 
