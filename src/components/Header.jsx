@@ -193,7 +193,21 @@ export default function Header({
     <header className="topbar">
       <div className="topbar-left">
         <span className="topbar-clock">{clockFormat.format(now)}</span>
-        <span className="topbar-station">{station}</span>
+        {/* The station name is also a way into the picker, the same action
+            as the search button, for anyone who reaches for the name. Kiosk
+            hides that button, so there the name is plain text again. */}
+        {kiosk ? (
+          <span className="topbar-station">{station}</span>
+        ) : (
+          <button
+            type="button"
+            className="topbar-station"
+            onClick={onPickStation}
+            aria-label={`${pickLabel}: ${station}`}
+          >
+            {station}
+          </button>
+        )}
       </div>
       {/* The board's title is also its switch: one button that looks like
           the title, with a chevron in a slot reserved on both sides, so the

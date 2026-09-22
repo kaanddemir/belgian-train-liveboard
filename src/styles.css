@@ -350,6 +350,22 @@ body{
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
+  /* a button that still reads as the bar's text */
+  padding:0;
+  border:0;
+  border-radius:var(--radius-sm);
+  background:transparent;
+  color:inherit;
+  font-family:inherit;
+  line-height:inherit;
+  cursor:pointer;
+  transition:opacity var(--transition-fast);
+}
+.topbar-station:hover{ opacity:1; text-decoration:underline; text-underline-offset:.2em; }
+.topbar-station:active{ opacity:.75; }
+.topbar-station:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
 }
 /* The time of the data on the bar, in the right track before the search
    control. It is secondary information in the station name's role, so it
@@ -1096,6 +1112,45 @@ body.kiosk-idle *{ cursor:none !important; }
   stroke-width:2;
   stroke-linecap:round;
 }
+
+/* The nearest-station control, just left of the search glyph: the
+   star's quiet round button, at the field's icon size. */
+.station-locate{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  height:44px;
+  margin-left:clamp(8px, 1.2vw, 14px);
+  margin-right:calc(-1 * clamp(4px, .8vw, 10px));
+  padding:0;
+  border:0;
+  border-radius:var(--radius-pill);
+  background:none;
+  color:var(--color-surface-icon);
+  cursor:pointer;
+  transition:background-color var(--transition-fast), color var(--transition-fast);
+}
+.station-locate svg{
+  width:clamp(19px, 2.4vw, 28px);
+  height:clamp(19px, 2.4vw, 28px);
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+}
+.station-locate:hover:enabled,
+.station-locate:active:enabled{
+  background:var(--color-surface-active);
+  color:var(--color-surface-ink);
+}
+.station-locate:focus-visible{
+  outline:2px solid var(--color-topbar);
+  outline-offset:-2px;
+}
+.station-locate:disabled{ opacity:.45; cursor:default; }
+.station-locate.is-busy{ color:var(--color-topbar); }
 
 /* --- suggestions -------------------------------------------------- */
 
@@ -3097,6 +3152,7 @@ body.modal-open{ overflow:hidden; }
   .station-back,
   .station-apply,
   .station-swap,
+  .station-locate,
   .notice__clear,
   .topbar-pick,
   .topbar-board__chevron,

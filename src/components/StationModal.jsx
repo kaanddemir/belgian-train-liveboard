@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getStations, searchStations } from '../services/irail.js';
+import { getStations, nearestStation, searchStations } from '../services/irail.js';
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
@@ -36,6 +36,8 @@ export default function StationModal({
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [failed, setFailed] = useState(false);
+  // Nearest-station lookup: null, 'busy', 'denied' or 'failed'.
+  const [locating, setLocating] = useState(null);
   // Shown only after a refused sixth favourite, and only until the next
   // change: the limit is not a standing warning.
   const [atLimit, setAtLimit] = useState(false);
@@ -198,6 +200,22 @@ export default function StationModal({
 
   const choose = (station) => { onSelect(station); onClose(); };
 
+  // One position read, on request only; the answer is the nearest station
+  // in the /stations list already loaded, so no request is added.
+  const locate = () => {
+    if (!loaded || locating === 'busy') return;
+    if (!navigator.geolocation) { setLocating('failed'); return; }
+    setLocating('busy');
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const station = nearestStation(stations.list, coords.latitude, coords.longitude);
+        if (station) { setLocating(null); choose(station); } else setLocating('failed');
+      },
+      (err) => setLocating(err.code === err.PERMISSION_DENIED ? 'denied' : 'failed'),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  };
+
   /* --- favourites --------------------------------------------------- */
 
   // Identity is the canonical station id, so the star is right whatever
@@ -275,6 +293,12 @@ export default function StationModal({
 
   const status = failed
     ? t.listFailed
+    : locating === 'busy'
+      ? t.locating
+      : locating === 'denied'
+        ? t.locateDenied
+        : locating === 'failed'
+          ? t.locateFailed
     : !loaded
       ? t.loading
       : term && !results.length
@@ -327,7 +351,7 @@ export default function StationModal({
                 className="station-input"
                 type="text"
                 value={query}
-                onChange={(e) => { setQuery(e.target.value); setActive(0); }}
+                onChange={(e) => { setQuery(e.target.value); setActive(0); setLocating(null); }}
                 onKeyDown={(e) => onListKeyDown(e, choose)}
                 placeholder={t.search}
                 aria-label={t.search}
@@ -338,6 +362,23 @@ export default function StationModal({
                 aria-controls={results.length ? 'station-results' : undefined}
                 aria-activedescendant={results.length ? `station-option-${active}` : undefined}
               />
+              <button
+                type="button"
+                className={`station-locate${locating === 'busy' ? ' is-busy' : ''}`}
+                onClick={locate}
+                disabled={!loaded}
+                aria-label={t.locate}
+                title={t.locate}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="6.5" />
+                  <circle cx="12" cy="12" r="2" />
+                  <line x1="12" y1="2.5" x2="12" y2="5.5" />
+                  <line x1="12" y1="18.5" x2="12" y2="21.5" />
+                  <line x1="2.5" y1="12" x2="5.5" y2="12" />
+                  <line x1="18.5" y1="12" x2="21.5" y2="12" />
+                </svg>
+              </button>
               <svg className="station-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="11" cy="11" r="6.5" />
                 <line x1="15.8" y1="15.8" x2="20" y2="20" />

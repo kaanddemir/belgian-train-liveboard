@@ -547,6 +547,8 @@ export function getStations(lang = 'nl') {
             // other language still resolves: "bruxelles-midi" as well as
             // "brussel-zuid".
             slugs: slugAliases(s),
+            // Only for "nearest station"; null when iRail gives no usable pair.
+            location: coordinates(s),
           };
         })
         .filter((s) => s.name))
@@ -648,6 +650,23 @@ const majorRank = (halves) => Math.min(
 // language variant of the name. Ordered: an exact name, then names starting
 // with the query, then a later word, then anything containing it — and
 // inside each of those, the bigger stations first, then alphabetically.
+// The station closest to a point, by great-circle distance. Stations
+// without a usable position are skipped; null when none has one.
+export function nearestStation(stations, latitude, longitude) {
+  const rad = Math.PI / 180;
+  let best = null;
+  let bestD = Infinity;
+  for (const s of stations) {
+    if (!s.location) continue;
+    const dLat = (s.location.latitude - latitude) * rad;
+    const dLon = (s.location.longitude - longitude) * rad;
+    const a = Math.sin(dLat / 2) ** 2
+      + Math.cos(latitude * rad) * Math.cos(s.location.latitude * rad) * Math.sin(dLon / 2) ** 2;
+    if (a < bestD) { bestD = a; best = s; }
+  }
+  return best;
+}
+
 export function searchStations(stations, query, limit = 7) {
   const q = fold(query);
   if (!q) return [];
