@@ -237,6 +237,17 @@ function evaluate(raw, trainNumber, stationKey) {
   };
 }
 
+// Whether a result has anything to say about this train. `none` covers
+// no lookup key, a missing or broken shard and an untrusted file, so it
+// is never worth a way in; nor is a window that has not seen this train
+// here at all. Collecting, stale and a real but small sample all are.
+// Null (still loading) is not yet anything.
+export function hasPerformance(result) {
+  if (!result || result.state === 'none') return false;
+  if (result.state === 'ok') return result.samples > 0;
+  return true;
+}
+
 // The answer if there is one to be had without waiting, and null when
 // the shard has not been fetched yet. Null means "ask and wait", never
 // "no history" — the panel shows its loading state on it.

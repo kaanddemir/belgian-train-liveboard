@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 'react';
 import DepartureRow, { formatTime } from './DepartureRow.jsx';
+import { hasPerformance } from '../services/punctuality.js';
 
 // The optional route map, and with it Leaflet, Leaflet's stylesheet and
 // the Infrabel rail graph, are reached only through this dynamic import.
@@ -327,6 +328,10 @@ export default function TrainDetailsModal({
     return () => mq.removeEventListener('change', sync);
   }, []);
 
+  // The figures belong to one train: another one opened in place (a
+  // history step, a shared link) starts with the section closed.
+  useEffect(() => { setPerfOpen(false); }, [departure?.id]);
+
   useEffect(() => {
     if (!open) return;
     // Focus goes into the dialog and comes back to the row afterwards.
@@ -417,8 +422,14 @@ export default function TrainDetailsModal({
 
   if (!open) return null;
 
+  // Each footer action is offered only once it leads somewhere, and
+  // each waits only for its own data: the figures for their shard, the
+  // map for the /vehicle journey.
+  const showPerf = hasPerformance(performance);
+  const showMap = !loading && Boolean(route);
   const last = route ? route.length - 1 : -1;
-  const occupancy = journeyOccupancy(route, stationId);
+  // never a previous journey's reading while this one is still loading
+  const occupancy = loading ? null : journeyOccupancy(route, stationId);
 
   return (
     <div
@@ -627,8 +638,10 @@ export default function TrainDetailsModal({
             figures are keyed on the train number and this station, not
             on the journey, so a train iRail has no /vehicle route for
             still has a history worth showing. Only the map needs the
-            route, so only the map's button waits for one. */}
-        {!mapOpen && !loading && (
+            route, so only the map's button waits for one. Occupancy is
+            read from the route, so it cannot appear before it either.
+            With nothing to carry, the foot is not drawn at all. */}
+        {!mapOpen && (occupancy || showPerf || showMap) && (
           <>
             <div className="train-details__footer">
               {occupancy && (
@@ -641,26 +654,28 @@ export default function TrainDetailsModal({
                   group on the right so they read as a pair at every
                   width and never wrap apart. */}
               <div className="train-details__actions">
-                {/* A disclosure, not a view. It is always offered, from
-                    the moment the panel opens: the section always has
-                    something to say, even if that is only that it is
-                    still fetching. */}
-                <button
-                  type="button"
-                  className="train-details__disclose"
-                  onClick={() => setPerfOpen((v) => !v)}
-                  aria-expanded={perfOpen}
-                  aria-controls={perfOpen ? perfId : undefined}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <polyline points="4,15.5 10,9.5 14,13.5 20,7.5" />
-                    <polyline points="15.5,7.5 20,7.5 20,12" />
-                  </svg>
-                  {t.performance}
-                </button>
+                {/* A disclosure, not a view. Offered once the shard has
+                    answered with something about this train — figures, a
+                    count, a window still filling or one fallen behind —
+                    and never for "no data", which would open onto nothing. */}
+                {showPerf && (
+                  <button
+                    type="button"
+                    className="train-details__disclose"
+                    onClick={() => setPerfOpen((v) => !v)}
+                    aria-expanded={perfOpen}
+                    aria-controls={perfOpen ? perfId : undefined}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <polyline points="4,15.5 10,9.5 14,13.5 20,7.5" />
+                      <polyline points="15.5,7.5 20,7.5 20,12" />
+                    </svg>
+                    {t.performance}
+                  </button>
+                )}
                 {/* The map is the one thing here that genuinely needs the
                     journey, so it is the one thing gated on it. */}
-                {route && (
+                {showMap && (
                   <button
                     type="button"
                     className="train-details__map-open"
@@ -678,7 +693,7 @@ export default function TrainDetailsModal({
               </div>
             </div>
 
-            {perfOpen && (
+            {perfOpen && showPerf && (
               <TrainPerformance performance={performance} t={t} id={perfId} />
             )}
           </>
