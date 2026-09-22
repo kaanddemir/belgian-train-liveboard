@@ -106,6 +106,12 @@ npm run build
 npm run preview
 ```
 
+Run the unit tests (offline, no browser):
+
+```bash
+npm test
+```
+
 There are no environment variables, backend services, or API credentials to configure.
 
 ## Architecture

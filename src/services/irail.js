@@ -349,7 +349,7 @@ const serviceDayFormat = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Brussels', year: 'numeric', month: '2-digit', day: '2-digit',
 });
 
-function serviceDay(date) {
+export function serviceDay(date) {
   const parts = Object.fromEntries(
     serviceDayFormat.formatToParts(date)
       .filter((part) => part.type !== 'literal')
@@ -374,7 +374,7 @@ const brusselsHourFormat = new Intl.DateTimeFormat('en-GB', {
 // The calendar day before a service day. Pure date arithmetic on the day
 // number, so a DST night (23 or 25 hours long) cannot skip or repeat a
 // day the way subtracting 24 hours from a timestamp would.
-function previousServiceDay(service) {
+export function previousServiceDay(service) {
   const day = new Date((service.number - 1) * 86_400_000);
   const year = String(day.getUTCFullYear());
   const month = String(day.getUTCMonth() + 1).padStart(2, '0');
@@ -389,7 +389,7 @@ function previousServiceDay(service) {
 // Whether a journey is the run the row describes: it calls at the
 // board's station at exactly the row's scheduled time. The train number
 // repeats every day, so the number alone proves nothing.
-function callsAt(stops, stationId, time) {
+export function callsAt(stops, stationId, time) {
   if (!stops || !stationId) return false;
   const at = time.getTime();
   return stops.some((s) => s.id === stationId
