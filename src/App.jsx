@@ -46,6 +46,8 @@ const TRAIN_PATTERN = /^[A-Za-z0-9]{1,12}$/;
 // 2001-09-09 .. 2100-01-01: anything outside is not a departure time.
 const DEP_MIN = 1_000_000_000;
 const DEP_MAX = 4_102_444_800;
+// How long the "no longer on the board" line stays before it clears itself.
+const MISSING_LINK_MS = 10_000;
 
 const CONFIG = {
   // Which of the two real screen types to imitate:
@@ -1297,9 +1299,23 @@ export default function App() {
   // The removed button took focus with it; hand it to the first train.
   const dismissMissingLink = useCallback(() => {
     setMissingLink(false);
-    requestAnimationFrame(() => screenRef.current
-      ?.querySelector('.departure-row.is-openable, .topbar-pick')?.focus());
+    requestAnimationFrame(() => {
+      const screen = screenRef.current;
+      (screen?.querySelector('.departure-row.is-openable')
+        || screen?.querySelector('.topbar-pick'))?.focus();
+    });
   }, []);
+  // The notice is transient: it goes by itself after ten seconds. Focus
+  // is only moved if it was on the notice's own X, which is going away.
+  useEffect(() => {
+    if (!missingLink) return undefined;
+    const id = setTimeout(() => {
+      if (document.activeElement?.closest('.departure-board__notice')) dismissMissingLink();
+      else setMissingLink(false);
+    }, MISSING_LINK_MS);
+    return () => clearTimeout(id);
+  }, [missingLink, dismissMissingLink]);
+
   const closeStationPicker = useCallback(() => setPicking(false), []);
   // An entry this session pushed for the panel is stepped back over, so
   // Back and Close agree. A link opened directly has nothing of ours

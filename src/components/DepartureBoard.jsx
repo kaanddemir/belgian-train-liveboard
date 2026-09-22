@@ -8,12 +8,14 @@ export default function DepartureBoard({ departures, layout, viaStops, t, empty,
           away from. Announced by App, not here. */}
       {notice && (
         <div className="departure-board__notice">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <line x1="12" y1="11" x2="12" y2="16.5" />
-            <line x1="12" y1="7.6" x2="12" y2="7.7" />
-          </svg>
-          <span className="departure-board__notice-text">{notice}</span>
+          <span className="departure-board__notice-message">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <line x1="12" y1="11" x2="12" y2="16.5" />
+              <line x1="12" y1="7.6" x2="12" y2="7.7" />
+            </svg>
+            <span className="departure-board__notice-text">{notice}</span>
+          </span>
           <button
             type="button"
             className="notice__clear"

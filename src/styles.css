@@ -573,7 +573,6 @@ body{
   height:var(--row-h);
   display:flex;
   align-items:center;
-  gap:.5em;
   padding:0 var(--pad-r) 0 var(--pad-l);
   position:relative;
   font-size:clamp(14px, calc(var(--row-h) * var(--f-via)), 56px);
@@ -586,7 +585,27 @@ body{
   left:.7vw; right:.7vw; bottom:0;
   border-bottom:1px solid var(--color-divider);
 }
-.departure-board__notice svg{
+.departure-board__notice-message{
+  flex:1 1 auto;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:.5em;
+}
+/* On the compact board the line takes the rows' own column tracks: the
+   message spans up to the platform column and the X sits centred in it,
+   on the same vertical as the platform numbers below. */
+.layout-compact .departure-board__notice{
+  display:grid;
+  grid-template-columns:var(--grid-compact);
+}
+.layout-compact .departure-board__notice-message{ grid-column:1 / -2; }
+.layout-compact .departure-board__notice .notice__clear{
+  grid-column:-2;
+  justify-self:center;
+  margin-left:0;
+}
+.departure-board__notice-message > svg{
   flex:0 0 auto;
   width:1.1em;
   height:1.1em;
@@ -595,14 +614,15 @@ body{
   stroke-width:2;
   stroke-linecap:round;
 }
-.departure-board__notice svg line:last-of-type{ stroke-width:2.6; }
+.departure-board__notice-message > svg line:last-of-type{ stroke-width:2.6; }
 .departure-board__notice-text{
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.departure-board__notice .notice__clear{ width:1.6em; height:1.6em; }
+/* sized from the line's own type, like the icon on its left */
+.departure-board__notice .notice__clear{ font-size:inherit; width:1.6em; height:1.6em; }
 .departure-board__notice ~ .departure-board__empty{ height:calc(100% - var(--row-h)); }
 
 .departure-board__empty{
@@ -2434,6 +2454,8 @@ body.modal-open{ overflow:hidden; }
     font-size:clamp(13px, 3.6vw, 16px);
   }
   .departure-board__notice-text{ white-space:normal; }
+  .layout-compact .departure-board__notice{ display:flex; }
+  .layout-compact .departure-board__notice .notice__clear{ margin-left:auto; }
   .departure-board__notice ~ .departure-board__empty{ height:auto; }
   .departure-board__empty{
     display:block;
