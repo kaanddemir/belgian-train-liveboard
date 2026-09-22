@@ -216,6 +216,8 @@ This project is not official SNCB/NMBS software and is not affiliated with, endo
 
 SNCB/NMBS names and trademarks remain the property of their respective owners.
 
+For legal, attribution and data-use information, see [DISCLAIMER.md](DISCLAIMER.md).
+
 ## License
 
 Released under the [MIT License](LICENSE).

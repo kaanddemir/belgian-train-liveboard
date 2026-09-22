@@ -173,16 +173,24 @@ const TEXT = {
     about: 'Over dit bord',
     stationLabel: 'Station',
     updated: 'Laatst bijgewerkt',
-    aboutWhat: 'Dit is een onafhankelijk, niet-commercieel project om Belgische treinvertrekken te bekijken in een interface in de stijl van een stationsbord.',
-    aboutIndependent: 'Het is geen officieel product van SNCB/NMBS en is niet verbonden aan, goedgekeurd door of uitgebaat door SNCB/NMBS.',
-    aboutData: 'Live spoorweggegevens worden geleverd via de',
+    aboutWhat: 'Belgian Train Departures is een onafhankelijk project om Belgische treinvertrekken te bekijken in een interface naar het voorbeeld van een stationsbord.',
+    aboutFeatures: 'Het brengt live vertrekken, treindetails, routekaarten en historische stiptheid samen op één plek.',
+    aboutData: 'Live spoorweggegevens komen van de',
     aboutIRail: 'iRail API',
-    aboutMapData: 'De optionele routekaart tekent het spoortracé op basis van open data van Infrabel (CC0); de achtergrondkaart is © OpenStreetMap-bijdragers. Het tracé volgt echte spoorlijnen, maar de sporen waarover de trein precies rijdt, kunnen afwijken.',
-    aboutPerformance: 'De prestatiecijfers bij de treindetails zijn gebaseerd op ruwe stiptheidsgegevens uit de open data van Infrabel (CC0), over de laatste 30 dienstdagen. Ze worden door deze onafhankelijke site berekend en zijn geen officiële statistieken van Infrabel of SNCB/NMBS.',
-    aboutLive: 'De informatie wordt uitsluitend ter informatie getoond. Live vertrektijden, vertragingen, sporen, afschaffingen en andere dienstinformatie kunnen soms onvolledig, vertraagd, onnauwkeurig of tijdelijk niet beschikbaar zijn.',
+    aboutMapData: 'Spoorroutes en historische stiptheid zijn afgeleid van Infrabel Open Data; de kaarten gebruiken OpenStreetMap.',
+    aboutPerformance: 'De historische prestaties in de treindetails worden door dit project berekend uit vroegere aankomstvertragingen, om te tonen hoe een trein doorgaans reed in het gekozen station.',
+    aboutPurpose: 'Het project wil een lichte, onofficiële manier bieden om Belgische spoorweginformatie te verkennen.',
     aboutOfficial: 'Raadpleeg voor officiële reisinformatie',
     aboutOfficialSuffix: 'of de betrokken spoorwegmaatschappij.',
-    aboutTrademarks: 'De namen en handelsmerken SNCB/NMBS blijven eigendom van hun respectieve rechthebbenden.',
+    legal: 'Juridisch & disclaimer',
+    legalSections: [
+      ['Onafhankelijk project', 'Deze site is niet verbonden aan, gesponsord, goedgekeurd of uitgebaat door SNCB/NMBS, Infrabel, iRail of een andere spoorwegmaatschappij.'],
+      ['Gegevens en nauwkeurigheid', 'Vertrektijden, vertragingen, sporen, afschaffingen en andere dienstinformatie kunnen vertraagd, onvolledig, onjuist of niet beschikbaar zijn. Controleer belangrijke reisinformatie altijd bij officiële bronnen.'],
+      ['Historische prestaties', 'Deze cijfers zijn afgeleid van historische stiptheidsgegevens. Het zijn geen voorspellingen en geen officiële statistieken van SNCB/NMBS, Infrabel of iRail.'],
+      ['Gegevens en diensten van derden', 'Live gegevens: iRail API. Routes en stiptheid: Infrabel Open Data (CC0). Achtergrondkaart: © OpenStreetMap-bijdragers.'],
+      ['Geen garantie', 'De informatie wordt uitsluitend ter informatie aangeboden. Voor zover toegestaan door het toepasselijke recht wordt niet gegarandeerd dat ze volledig, actueel of foutloos is. Gebruik deze site niet als enige bron voor tijdgevoelige reisbeslissingen.'],
+      ['Handelsmerken', 'Namen, logo’s en handelsmerken blijven eigendom van hun respectieve eigenaars. Het vermelden ervan houdt geen verbondenheid of goedkeuring in.'],
+    ],
     fullscreen: 'Volledig scherm',
     fullscreenExit: 'Volledig scherm verlaten',
     unknownStation: (s) => `Onbekend station “${s}”`,
@@ -270,16 +278,24 @@ const TEXT = {
     about: 'À propos',
     stationLabel: 'Gare',
     updated: 'Dernière mise à jour',
-    aboutWhat: "Ce projet indépendant et non commercial permet de consulter les départs des trains belges dans une interface inspirée des tableaux de gare.",
-    aboutIndependent: "Il ne s'agit pas d'un produit officiel de SNCB/NMBS et il n'est ni affilié à, ni approuvé par, ni exploité par SNCB/NMBS.",
-    aboutData: 'Les données ferroviaires en temps réel sont fournies via',
+    aboutWhat: 'Belgian Train Departures est un projet indépendant pour consulter les départs des trains belges dans une interface inspirée des tableaux de gare.',
+    aboutFeatures: 'Il réunit en un seul endroit les départs en temps réel, les détails des trains, les cartes de parcours et la ponctualité historique.',
+    aboutData: 'Les données ferroviaires en temps réel proviennent de',
     aboutIRail: 'l’API iRail',
-    aboutMapData: 'La carte optionnelle du parcours trace la voie à partir des données ouvertes d’Infrabel (CC0) ; le fond de carte est © les contributeurs d’OpenStreetMap. Le tracé suit de vraies lignes ferroviaires, mais les voies exactement empruntées par le train peuvent différer.',
-    aboutPerformance: 'Les chiffres de ponctualité affichés dans les détails du train proviennent des données brutes de ponctualité publiées en open data par Infrabel (CC0), sur les 30 derniers jours de service. Ils sont calculés par ce site indépendant et ne constituent pas des statistiques officielles d’Infrabel ou de SNCB/NMBS.',
-    aboutLive: "Les informations sont fournies à titre informatif uniquement. Les heures de départ, retards, voies, suppressions et autres informations de service en temps réel peuvent parfois être incomplets, retardés, inexacts ou temporairement indisponibles.",
+    aboutMapData: 'Les tracés ferroviaires et la ponctualité historique sont issus des données ouvertes d’Infrabel ; les cartes utilisent OpenStreetMap.',
+    aboutPerformance: 'La ponctualité historique affichée dans les détails du train est calculée par ce projet à partir des retards d’arrivée passés, pour montrer comment un train a généralement circulé dans la gare choisie.',
+    aboutPurpose: 'Le projet se veut une façon légère et non officielle d’explorer l’information ferroviaire belge.',
     aboutOfficial: 'Pour obtenir des informations de voyage officielles, consultez',
     aboutOfficialSuffix: 'ou l’opérateur ferroviaire concerné.',
-    aboutTrademarks: 'Les noms et marques SNCB/NMBS restent la propriété de leurs détenteurs respectifs.',
+    legal: 'Mentions légales',
+    legalSections: [
+      ['Projet indépendant', 'Ce site n’est ni affilié à, ni sponsorisé, approuvé ou exploité par SNCB/NMBS, Infrabel, iRail ou tout autre opérateur ferroviaire.'],
+      ['Données et exactitude', 'Les heures de départ, retards, voies, suppressions et autres informations de service peuvent être retardés, incomplets, inexacts ou indisponibles. Vérifiez toujours les informations importantes auprès des sources officielles.'],
+      ['Ponctualité historique', 'Ces chiffres sont dérivés de données historiques de ponctualité. Ce ne sont pas des prévisions, ni des statistiques officielles de SNCB/NMBS, d’Infrabel ou d’iRail.'],
+      ['Données et services tiers', 'Données en temps réel : API iRail. Parcours et ponctualité : Infrabel Open Data (CC0). Fond de carte : © contributeurs d’OpenStreetMap.'],
+      ['Absence de garantie', 'Les informations sont fournies à titre informatif. Dans la mesure permise par la loi applicable, aucune garantie n’est donnée quant à leur exhaustivité, leur actualité ou leur exactitude. Ne vous fiez pas à ce site comme seule source pour des décisions de voyage urgentes.'],
+      ['Marques', 'Les noms, logos et marques restent la propriété de leurs détenteurs respectifs. Leur mention n’implique ni affiliation ni approbation.'],
+    ],
     fullscreen: 'Plein écran',
     fullscreenExit: 'Quitter le plein écran',
     unknownStation: (s) => `Gare inconnue « ${s} »`,
@@ -367,16 +383,24 @@ const TEXT = {
     about: 'About',
     stationLabel: 'Station',
     updated: 'Last updated',
-    aboutWhat: 'This is an independent, non-commercial project for viewing Belgian train departures in a station-board style interface.',
-    aboutIndependent: 'It is not an official SNCB/NMBS product and is not affiliated with, endorsed by, or operated by SNCB/NMBS.',
+    aboutWhat: 'Belgian Train Departures is an independent project for viewing Belgian train departures in a station-board-inspired interface.',
+    aboutFeatures: 'It brings together live departures, Train Details, route maps and historical punctuality insights in one place.',
     aboutData: 'Live railway data is provided through the',
     aboutIRail: 'iRail API',
-    aboutMapData: 'The optional route map draws the railway line from Infrabel open data (CC0); the base map is © OpenStreetMap contributors. The line follows real railway lines, but the exact tracks used by the train may differ.',
-    aboutPerformance: 'The performance figures in the train details are derived from raw punctuality data published as Infrabel Open Data (CC0), over the last 30 service days. They are calculated by this independent site and are not official Infrabel or SNCB/NMBS statistics.',
-    aboutLive: 'Information shown here is provided for informational purposes only. Live departure times, delays, platforms, cancellations and other service information may occasionally be incomplete, delayed, inaccurate or temporarily unavailable.',
+    aboutMapData: 'Railway routes and historical punctuality data are derived from Infrabel Open Data, while maps use OpenStreetMap.',
+    aboutPerformance: 'Historical Performance in Train Details is calculated by this project from past arrival-delay data, to give context about how a train has typically performed at the selected station.',
+    aboutPurpose: 'The project is intended as a lightweight, unofficial way to explore Belgian railway information.',
     aboutOfficial: 'For official travel information, please consult',
     aboutOfficialSuffix: 'or the relevant railway operator.',
-    aboutTrademarks: 'SNCB/NMBS names and trademarks remain the property of their respective owners.',
+    legal: 'Legal & Disclaimer',
+    legalSections: [
+      ['Independent project', 'This site is not affiliated with, sponsored by, endorsed by, or operated by SNCB/NMBS, Infrabel, iRail or any railway operator.'],
+      ['Data and accuracy', 'Departure times, delays, platforms, cancellations and other service information may be delayed, incomplete, inaccurate or unavailable. Always verify important travel information with official sources.'],
+      ['Historical performance', 'These figures are derived from historical punctuality data. They are not predictions, and they are not official SNCB/NMBS, Infrabel or iRail statistics.'],
+      ['Third-party data and services', 'Live data: iRail API. Routes and punctuality: Infrabel Open Data (CC0). Base map: © OpenStreetMap contributors.'],
+      ['No warranty', 'Information is provided for informational purposes only. To the extent permitted by applicable law, no guarantee is made that it is complete, current or error-free. Do not rely on this site as your sole source for time-sensitive travel decisions.'],
+      ['Trademarks', 'Names, logos and trademarks remain the property of their respective owners. Their inclusion does not imply affiliation or endorsement.'],
+    ],
     fullscreen: 'Full screen',
     fullscreenExit: 'Exit full screen',
     unknownStation: (s) => `Unknown station “${s}”`,
@@ -464,16 +488,24 @@ const TEXT = {
     about: 'Über diese Tafel',
     stationLabel: 'Bahnhof',
     updated: 'Zuletzt aktualisiert',
-    aboutWhat: 'Dies ist ein unabhängiges, nicht kommerzielles Projekt zur Anzeige belgischer Zugabfahrten in einer Benutzeroberfläche im Stil einer Bahnhofstafel.',
-    aboutIndependent: 'Es ist kein offizielles Produkt von SNCB/NMBS und ist weder mit SNCB/NMBS verbunden noch von SNCB/NMBS empfohlen oder betrieben.',
-    aboutData: 'Live-Bahndaten werden über die',
+    aboutWhat: 'Belgian Train Departures ist ein unabhängiges Projekt, das belgische Zugabfahrten in einer an Bahnhofstafeln angelehnten Oberfläche zeigt.',
+    aboutFeatures: 'Es vereint Live-Abfahrten, Zugdetails, Streckenkarten und historische Pünktlichkeit an einem Ort.',
+    aboutData: 'Live-Bahndaten stammen aus der',
     aboutIRail: 'iRail API',
-    aboutMapData: 'Die optionale Streckenkarte zeichnet den Verlauf auf Basis offener Daten von Infrabel (CC0); die Hintergrundkarte stammt von © OpenStreetMap-Mitwirkenden. Der Verlauf folgt echten Bahnstrecken, die genauen Gleise, auf denen der Zug fährt, können jedoch abweichen.',
-    aboutPerformance: 'Die Pünktlichkeitswerte in den Zugdetails beruhen auf den Rohdaten zur Pünktlichkeit aus den offenen Daten von Infrabel (CC0) der letzten 30 Betriebstage. Sie werden von dieser unabhängigen Website berechnet und sind keine offiziellen Statistiken von Infrabel oder SNCB/NMBS.',
-    aboutLive: 'Die hier gezeigten Informationen dienen ausschließlich Informationszwecken. Live-Abfahrtszeiten, Verspätungen, Gleise, Zugausfälle und andere Betriebsinformationen können gelegentlich unvollständig, verspätet, ungenau oder vorübergehend nicht verfügbar sein.',
+    aboutMapData: 'Bahnstrecken und historische Pünktlichkeitsdaten stammen aus Infrabel Open Data; die Karten nutzen OpenStreetMap.',
+    aboutPerformance: 'Die historische Pünktlichkeit in den Zugdetails berechnet dieses Projekt aus vergangenen Ankunftsverspätungen – als Einordnung, wie ein Zug am gewählten Bahnhof üblicherweise unterwegs war.',
+    aboutPurpose: 'Das Projekt soll eine schlanke, inoffizielle Möglichkeit bieten, belgische Bahninformationen zu erkunden.',
     aboutOfficial: 'Offizielle Reiseinformationen erhalten Sie bei',
     aboutOfficialSuffix: 'oder dem jeweiligen Eisenbahnunternehmen.',
-    aboutTrademarks: 'Die Namen und Marken SNCB/NMBS bleiben Eigentum ihrer jeweiligen Inhaber.',
+    legal: 'Rechtliches & Haftungsausschluss',
+    legalSections: [
+      ['Unabhängiges Projekt', 'Diese Website ist weder mit SNCB/NMBS, Infrabel, iRail oder einem anderen Eisenbahnunternehmen verbunden noch von ihnen gesponsert, empfohlen oder betrieben.'],
+      ['Daten und Genauigkeit', 'Abfahrtszeiten, Verspätungen, Gleise, Zugausfälle und andere Betriebsinformationen können verzögert, unvollständig, ungenau oder nicht verfügbar sein. Prüfen Sie wichtige Reiseinformationen stets bei offiziellen Quellen.'],
+      ['Historische Pünktlichkeit', 'Diese Werte beruhen auf historischen Pünktlichkeitsdaten. Sie sind keine Prognosen und keine offiziellen Statistiken von SNCB/NMBS, Infrabel oder iRail.'],
+      ['Daten und Dienste Dritter', 'Live-Daten: iRail API. Strecken und Pünktlichkeit: Infrabel Open Data (CC0). Hintergrundkarte: © OpenStreetMap-Mitwirkende.'],
+      ['Keine Gewähr', 'Die Informationen dienen ausschließlich Informationszwecken. Soweit nach geltendem Recht zulässig, wird keine Gewähr für Vollständigkeit, Aktualität oder Fehlerfreiheit übernommen. Verlassen Sie sich bei zeitkritischen Reiseentscheidungen nicht allein auf diese Website.'],
+      ['Marken', 'Namen, Logos und Marken bleiben Eigentum ihrer jeweiligen Inhaber. Ihre Nennung bedeutet keine Verbindung oder Billigung.'],
+    ],
     fullscreen: 'Vollbild',
     fullscreenExit: 'Vollbild beenden',
     unknownStation: (s) => `Unbekannter Bahnhof „${s}“`,
@@ -712,7 +744,8 @@ export default function App() {
   // the name, the id and the slug are all derived from it.
   const [destination, setDestination] = useState(null);
   const [picking, setPicking] = useState(false);
-  const [about, setAbout] = useState(false);
+  // which informational panel is open, if any: 'about' | 'legal'
+  const [info, setInfo] = useState(null);
   // Only the id of the opened departure: the departure itself is derived
   // from the live list below, so it keeps refreshing while the overlay is
   // open instead of freezing a copy.
@@ -1327,8 +1360,9 @@ export default function App() {
     if (window.history.state?.trainDetails) window.history.back();
     else clearLinkFromUrl();
   }, []);
-  const openAbout = useCallback(() => setAbout(true), []);
-  const closeAbout = useCallback(() => setAbout(false), []);
+  const openAbout = useCallback(() => setInfo('about'), []);
+  const openLegal = useCallback(() => setInfo('legal'), []);
+  const closeInfo = useCallback(() => setInfo(null), []);
 
   // Keep obscured application content out of both keyboard navigation and
   // the accessibility tree without placing either overlay inside an inert
@@ -1336,14 +1370,14 @@ export default function App() {
   useLayoutEffect(() => {
     const screen = screenRef.current;
     if (!screen) return undefined;
-    const modalOpen = picking || about || Boolean(selectedDeparture);
+    const modalOpen = picking || Boolean(info) || Boolean(selectedDeparture);
     const background = [...screen.children].filter(
       (node) => !node.classList.contains('station-overlay')
         && !node.classList.contains('train-overlay')
         && !node.classList.contains('about-overlay'));
     background.forEach((node) => { node.inert = modalOpen; });
     return () => background.forEach((node) => { node.inert = false; });
-  }, [picking, about, selectedDeparture]);
+  }, [picking, info, selectedDeparture]);
 
   return (
     <div className="screen" ref={screenRef}>
@@ -1368,10 +1402,12 @@ export default function App() {
         fullscreenExitLabel={t.fullscreenExit}
         menuLabel={t.menu}
         aboutLabel={t.about}
+        legalLabel={t.legal}
         stationLabel={t.stationLabel}
         updatedLabel={t.updated}
         updatedAt={updatedAt}
         onAbout={openAbout}
+        onLegal={openLegal}
       />
 
       <DepartureBoard
@@ -1448,7 +1484,7 @@ export default function App() {
         onToggleFavorite={toggleFavorite}
       />
 
-      <AboutModal open={about} t={t} onClose={closeAbout} />
+      <AboutModal kind={info} t={t} onClose={closeInfo} />
 
       <div className="sr-only" role="alert">{error ? t.offline : ''}</div>
       {/* Set once when a linked departure is not found; the board's own

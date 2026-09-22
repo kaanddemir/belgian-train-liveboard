@@ -377,6 +377,11 @@ body{
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
+  /* line-height:1 puts descenders (g, p, y) outside the line box, where
+     overflow:hidden would clip them; the padding makes room for them and
+     the equal negative margin keeps the box the same size */
+  padding-block:.15em;
+  margin-block:-.15em;
 }
 .topbar-right{
   justify-self:end;
@@ -1858,6 +1863,10 @@ body.modal-open{ overflow:hidden; }
 
 .about-panel{
   width:min(840px, 100%);
+  /* the overlay's padded box is the ceiling; past it only the body
+     scrolls, so the title bar never shrinks or scrolls away */
+  max-height:100%;
+  overflow:hidden;
   margin-block:auto;
   display:flex;
   flex-direction:column;
@@ -1873,18 +1882,34 @@ body.modal-open{ overflow:hidden; }
 .about-panel__bar .train-close{ justify-self:end; }
 
 .about-panel__body{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
   display:flex;
   flex-direction:column;
   gap:var(--space-4);
   padding:clamp(20px, 3vw, 34px);
   color:var(--color-board-text);
   font-size:var(--font-size-suggestion);
+  /* the page inherits the board's bold; prose reads in regular, so
+     only the title bar and the section headings carry weight */
+  font-weight:var(--font-weight-regular);
   line-height:1.5;
 }
 .about-panel__body p{ margin:0; }
-/* the first line says what the thing is, so it carries the board's
-   own emphasis weight */
-.about-panel__lead{ font-weight:var(--font-weight-bold); }
+/* Legal sections: a heading in the board's emphasis weight over one
+   short paragraph; no card, no rule, no second colour. */
+.about-panel__section{
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-1);
+}
+.about-panel__heading{
+  margin:0;
+  font-size:inherit;
+  font-weight:var(--font-weight-bold);
+}
 /* the caveat is the quietest line on the panel, like the board's own
    absent values */
 .about-panel__note{
@@ -2783,10 +2808,10 @@ body.modal-open{ overflow:hidden; }
     text-align:center;
   }
   /* the About panel folds the same way the details panel does */
-  .about-overlay{ padding:0; align-items:stretch; overflow-y:auto; }
+  .about-overlay{ padding:0; align-items:stretch; }
   .about-panel{
     width:100%;
-    min-height:100dvh;
+    height:100dvh;
     margin-block:0;
     border-radius:0;
   }

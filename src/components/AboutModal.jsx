@@ -12,9 +12,13 @@ const SNCB_NMBS = 'https://www.belgiantrain.be/';
    nothing here touches the API.
 
    Every sentence comes from the TEXT map in App.jsx, so the panel
-   follows the language the board is set to.
+   follows the language the board is set to. `kind` picks which of the
+   two informational faces it shows — 'about' or 'legal' — so only one
+   can ever be open, and both share one focus and Escape behaviour.
    ------------------------------------------------------------------ */
-export default function AboutModal({ open, t, onClose }) {
+export default function AboutModal({ kind, t, onClose }) {
+  const open = kind === 'about' || kind === 'legal';
+  const title = kind === 'legal' ? t.legal : t.about;
   const closeRef = useRef(null);
   const openerRef = useRef(null);
   const dialogRef = useRef(null);
@@ -69,12 +73,12 @@ export default function AboutModal({ open, t, onClose }) {
         className="about-panel"
         role="dialog"
         aria-modal="true"
-        aria-label={t.about}
+        aria-label={title}
       >
         {/* the board's own title bar, exactly as the details panel uses it */}
         <header className="topbar about-panel__bar">
           <span />
-          <div className="topbar-title">{t.about}</div>
+          <div className="topbar-title">{title}</div>
           <button
             type="button"
             className="topbar-pick train-close"
@@ -89,45 +93,48 @@ export default function AboutModal({ open, t, onClose }) {
           </button>
         </header>
 
-        <div className="about-panel__body">
-          <p className="about-panel__lead">{t.aboutWhat}</p>
-          <p>{t.aboutIndependent}</p>
-          <p>
-            {t.aboutData}{' '}
-            <a
-              className="about-panel__link"
-              href={IRAIL_DOCS}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t.aboutIRail}
-            </a>
-            .
-          </p>
-          {/* The optional route map adds two more sources, so they are
-              named here rather than crowding the map itself, which
-              carries only its one "approximate route" label. */}
-          <p>{t.aboutMapData}</p>
-          {/* The Performance section is the one place the board shows
-              anything historical, and its numbers are this site's own
-              arithmetic over Infrabel's open data — not a figure either
-              railway company publishes. Said here, once. */}
-          <p>{t.aboutPerformance}</p>
-          <p className="about-panel__note">{t.aboutLive}</p>
-          <p>
-            {t.aboutOfficial}{' '}
-            <a
-              className="about-panel__link"
-              href={SNCB_NMBS}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              SNCB/NMBS
-            </a>{' '}
-            {t.aboutOfficialSuffix}
-          </p>
-          <p>{t.aboutTrademarks}</p>
-        </div>
+        {kind === 'legal' ? (
+          <div className="about-panel__body">
+            {t.legalSections.map(([heading, text]) => (
+              <section key={heading} className="about-panel__section">
+                <h2 className="about-panel__heading">{heading}</h2>
+                <p>{text}</p>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="about-panel__body">
+            <p>{t.aboutWhat}</p>
+            <p>{t.aboutFeatures}</p>
+            <p>
+              {t.aboutData}{' '}
+              <a
+                className="about-panel__link"
+                href={IRAIL_DOCS}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.aboutIRail}
+              </a>
+              .{' '}
+              {t.aboutMapData}
+            </p>
+            <p>{t.aboutPerformance}</p>
+            <p>{t.aboutPurpose}</p>
+            <p>
+              {t.aboutOfficial}{' '}
+              <a
+                className="about-panel__link"
+                href={SNCB_NMBS}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                SNCB/NMBS
+              </a>{' '}
+              {t.aboutOfficialSuffix}
+            </p>
+          </div>
+        )}
       </section>
     </div>
   );

@@ -76,8 +76,9 @@ src/components/TrainDetailsModal.jsx  Train details overlay: the train's service
                                 route timeline (horizontal on desktop/tablet, vertical
                                 on a phone), stop details, occupancy, and the lazy
                                 import of the map view.
-src/components/AboutModal.jsx   About / disclaimer panel: independence, data sources and
-                                accuracy wording, all of it from TEXT.
+src/components/AboutModal.jsx   The informational panel, two faces picked by `kind`:
+                                About (short plain-language summary) and Legal &
+                                Disclaimer (six short sections), all of it from TEXT.
 src/services/irail.js           All iRail communication, response normalisation,
                                 caching and the station search/ranking algorithm.
 src/services/mockBoard.js       Development-only fixture board behind `?mock=1`.

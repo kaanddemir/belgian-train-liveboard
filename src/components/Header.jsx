@@ -48,7 +48,7 @@ export default function Header({
   station, title, onPickStation, pickLabel,
   languages = [], lang, onLanguage, languageLabel,
   fullscreenLabel, fullscreenExitLabel,
-  menuLabel, aboutLabel, onAbout,
+  menuLabel, aboutLabel, onAbout, legalLabel, onLegal,
   stationLabel, updatedLabel, updatedAt,
 }) {
   const fullscreen = useFullscreen();
@@ -248,6 +248,20 @@ export default function Header({
                   <line x1="12" y1="7.6" x2="12" y2="7.7" />
                 </svg>
                 {aboutLabel}
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                className="topbar-menu-item topbar-menu-item--row"
+                onClick={() => { closeMenu({ restoreFocus: false }); onLegal?.(); }}
+              >
+                <svg className="topbar-menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 3.5h7l4 4v13H7z" />
+                  <line x1="10" y1="12" x2="15" y2="12" />
+                  <line x1="10" y1="15.5" x2="15" y2="15.5" />
+                </svg>
+                {legalLabel}
               </button>
 
               {/* What the title bar carries on wide screens and drops when
