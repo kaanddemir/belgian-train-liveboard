@@ -565,6 +565,46 @@ body{
 
 .departure-board{ flex:1 1 auto; min-height:0; overflow:hidden; }
 
+/* A shared link whose departure has gone: one line of the board itself,
+   above the first train. Same height, padding and separator as a compact
+   row, type from the same --row-h fraction; yellow is attention on the
+   dark board. Not a banner: no fill, no box. */
+.departure-board__notice{
+  height:var(--row-h);
+  display:flex;
+  align-items:center;
+  gap:.5em;
+  padding:0 var(--pad-r) 0 var(--pad-l);
+  position:relative;
+  font-size:clamp(14px, calc(var(--row-h) * var(--f-via)), 56px);
+  line-height:1.1;
+  color:var(--color-destination);
+}
+.departure-board__notice::after{
+  content:"";
+  position:absolute;
+  left:.7vw; right:.7vw; bottom:0;
+  border-bottom:1px solid var(--color-divider);
+}
+.departure-board__notice svg{
+  flex:0 0 auto;
+  width:1.1em;
+  height:1.1em;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+}
+.departure-board__notice svg line:last-of-type{ stroke-width:2.6; }
+.departure-board__notice-text{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.departure-board__notice .notice__clear{ width:1.6em; height:1.6em; }
+.departure-board__notice ~ .departure-board__empty{ height:calc(100% - var(--row-h)); }
+
 .departure-board__empty{
   display:flex;
   align-items:center;
@@ -1405,6 +1445,17 @@ body.modal-open{ overflow:hidden; }
   stroke-linecap:round;
 }
 
+/* the share glyph: an arrow out of a tray, drawn like the close glyph */
+.train-share svg{
+  width:52%;
+  height:52%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
 /* --- route unavailable / loading --------------------------------- */
 
 .train-details__message{
@@ -1923,6 +1974,25 @@ body.modal-open{ overflow:hidden; }
 /* the dot of the "i", drawn as a round cap on a zero-length line */
 .train-info svg line:last-of-type{ stroke-width:2.6; }
 
+/* Share feedback reuses the accuracy note's popover. The manual-copy
+   field only appears when the clipboard refused. */
+.train-share__url{
+  display:block;
+  width:100%;
+  margin-top:var(--space-2);
+  padding:var(--space-2);
+  border:1px solid var(--color-surface-line);
+  border-radius:var(--radius-sm);
+  background:transparent;
+  color:var(--color-surface-ink);
+  font:inherit;
+  font-size:var(--font-size-menu-item);
+}
+.train-share__url:focus-visible{
+  outline:2px solid var(--color-topbar);
+  outline-offset:1px;
+}
+
 /* Leaflet measures its container, so the canvas needs a real height at
    every step rather than one fixed number. It is capped by viewport
    height so a tall desktop window does not hand the map the whole
@@ -2356,6 +2426,15 @@ body.modal-open{ overflow:hidden; }
      anonymous flex item the text could not wrap, so it ran off the
      screen. It reads as one of the app's ordinary messages here instead,
      in the role the details panel's "no route" line already uses. */
+  /* The missing-departure line follows the phone row's density: the
+     same em base and edge padding, not the desktop --row-h. */
+  .departure-board__notice{
+    height:auto;
+    padding:.7em var(--phone-edge);
+    font-size:clamp(13px, 3.6vw, 16px);
+  }
+  .departure-board__notice-text{ white-space:normal; }
+  .departure-board__notice ~ .departure-board__empty{ height:auto; }
   .departure-board__empty{
     display:block;
     height:auto;
@@ -2542,7 +2621,8 @@ body.modal-open{ overflow:hidden; }
      out of a full-screen overlay, so it keeps a 44px tap target — and
      the bar sizes to it rather than clipping it. */
   .train-details__bar{ flex:0 0 auto; padding-block:var(--space-1); }
-  .train-details__bar .train-close{ width:44px; height:44px; }
+  .train-details__bar .train-close,
+  .train-details__bar .train-share{ width:44px; height:44px; }
   /* The route turns vertical here, and only here: the same markup, the
      same states and the same tooltip-less phone detail — re-laid out.
      The stop becomes one row of the journey, `TIME | rail | NAME`, so

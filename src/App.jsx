@@ -36,6 +36,17 @@ const DOCUMENT_TITLE = 'Belgian Train Departures';
 // is resolved back to a real station object from the /stations list.
 const TO_PARAM = 'to';
 
+// An opened Train Details view, addressable while it is open: the train
+// number and the exact *scheduled* departure in Unix seconds. The number
+// alone repeats every day; the timestamp pins the one run, date included,
+// and a delay never changes it.
+const TRAIN_PARAM = 'train';
+const DEP_PARAM = 'dep';
+const TRAIN_PATTERN = /^[A-Za-z0-9]{1,12}$/;
+// 2001-09-09 .. 2100-01-01: anything outside is not a departure time.
+const DEP_MIN = 1_000_000_000;
+const DEP_MAX = 4_102_444_800;
+
 const CONFIG = {
   // Which of the two real screen types to imitate:
   //   'compact'  concourse overview — single-line rows, "via" list inline
@@ -175,6 +186,11 @@ const TEXT = {
     unknownStation: (s) => `Onbekend station “${s}”`,
     details: 'Treindetails',
     close: 'Sluiten',
+    share: 'Delen',
+    shareCopied: 'Link gekopieerd',
+    shareFailed: 'Kon de link niet kopiëren. Kopieer hem hieronder:',
+    shareLink: 'Link naar dit vertrek',
+    linkMissing: 'Dit vertrek staat niet meer op het bord',
     arrival: 'Aankomst',
     departureAt: 'Vertrek',
     extraStop: 'Extra halte',
@@ -267,6 +283,11 @@ const TEXT = {
     unknownStation: (s) => `Gare inconnue « ${s} »`,
     details: 'Détails du train',
     close: 'Fermer',
+    share: 'Partager',
+    shareCopied: 'Lien copié',
+    shareFailed: 'Impossible de copier le lien. Copiez-le ci-dessous :',
+    shareLink: 'Lien vers ce départ',
+    linkMissing: 'Ce départ n’est plus affiché',
     arrival: 'Arrivée',
     departureAt: 'Départ',
     extraStop: 'Arrêt supplémentaire',
@@ -359,6 +380,11 @@ const TEXT = {
     unknownStation: (s) => `Unknown station “${s}”`,
     details: 'Train details',
     close: 'Close',
+    share: 'Share',
+    shareCopied: 'Link copied',
+    shareFailed: 'Could not copy the link. Copy it below:',
+    shareLink: 'Link to this departure',
+    linkMissing: 'This departure is no longer on the board',
     arrival: 'Arrival',
     departureAt: 'Departure',
     extraStop: 'Extra stop',
@@ -451,6 +477,11 @@ const TEXT = {
     unknownStation: (s) => `Unbekannter Bahnhof „${s}“`,
     details: 'Zugdetails',
     close: 'Schließen',
+    share: 'Teilen',
+    shareCopied: 'Link kopiert',
+    shareFailed: 'Link konnte nicht kopiert werden. Bitte unten kopieren:',
+    shareLink: 'Link zu dieser Abfahrt',
+    linkMissing: 'Diese Abfahrt steht nicht mehr auf der Tafel',
     arrival: 'Ankunft',
     departureAt: 'Abfahrt',
     extraStop: 'Zusätzlicher Halt',
@@ -599,6 +630,59 @@ function slugsFromUrl() {
   };
 }
 
+// The departure named in the address bar: null when there is none,
+// `false` when the parameters are there but not a departure identity.
+function linkFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const train = params.get(TRAIN_PARAM);
+  const dep = params.get(DEP_PARAM);
+  if (train === null && dep === null) return null;
+  const seconds = /^\d{10}$/.test(dep ?? '') ? Number(dep) : NaN;
+  return TRAIN_PATTERN.test(train ?? '') && seconds >= DEP_MIN && seconds <= DEP_MAX
+    ? { train, dep: seconds }
+    : false;
+}
+
+// The same identity for a departure on the board. The train number is
+// `vehicleLabel()`'s; only a label it could not split falls back to the
+// last segment of the vehicle id. A row without a vehicle is not linkable.
+function departureLink(departure) {
+  if (!departure?.vehicleId || !(departure.time instanceof Date)) return null;
+  const train = departure.trainNumber || departure.vehicleId.split('.').pop();
+  const dep = Math.floor(departure.time.getTime() / 1000);
+  return TRAIN_PATTERN.test(train) && Number.isFinite(dep) ? { train, dep } : null;
+}
+
+const sameLink = (a, b) => Boolean(a && b) && a.train === b.train && a.dep === b.dep;
+
+// The current URL with the departure set, or removed when `link` is null.
+// Every other parameter (`station`, `to`, `mock`, ...) is left as it is.
+function urlWithLink(link) {
+  const url = new URL(window.location.href);
+  if (link) {
+    url.searchParams.set(TRAIN_PARAM, link.train);
+    url.searchParams.set(DEP_PARAM, String(link.dep));
+  } else {
+    url.searchParams.delete(TRAIN_PARAM);
+    url.searchParams.delete(DEP_PARAM);
+  }
+  return url;
+}
+
+// history.state minus the marker that says "this entry was pushed by
+// opening Train Details", so whatever else is in it survives.
+function stateWithoutDetails() {
+  const { trainDetails, ...rest } = window.history.state || {};
+  return Object.keys(rest).length ? rest : null;
+}
+
+// Drop the departure from the current entry without adding one.
+function clearLinkFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has(TRAIN_PARAM) && !params.has(DEP_PARAM)) return;
+  window.history.replaceState(stateWithoutDetails(), '', urlWithLink(null));
+}
+
 // Does this journey call at the chosen destination? The stop list handed
 // in is already the slice *after* the boarding stop, so a train that
 // passed the station earlier in its run does not match. Identity is the
@@ -631,6 +715,14 @@ export default function App() {
   // from the live list below, so it keeps refreshing while the overlay is
   // open instead of freezing a copy.
   const [openId, setOpenId] = useState(null);
+  // A departure named by the URL that has not been looked for yet, tagged
+  // with the id of the station it belongs to. One-shot: the first board of
+  // that station consumes it, found or not, so no later refresh reopens a
+  // panel the user has closed.
+  const [pendingLink, setPendingLink] = useState(null);
+  // That lookup came back empty. Shown as the board's first line until
+  // the user navigates somewhere else.
+  const [missingLink, setMissingLink] = useState(false);
   const [route, setRoute] = useState(null);        // the full /vehicle journey
   const [routeLoading, setRouteLoading] = useState(false);
   // How this train has run at this station over the last 30 service
@@ -700,7 +792,7 @@ export default function App() {
   // URL -> state. Resolving a slug means finding it in the real station
   // list; an id is never derived from the slug itself. Unknown slugs fall
   // back to the default station and say so in the notice strip.
-  const applyUrl = useCallback((list) => {
+  const applyUrl = useCallback((list, withLink) => {
     const slugs = slugsFromUrl();
     const found = slugs.station ? findStationBySlug(list, slugs.station) : null;
     // The address bar always wins. Only when it names no station does the
@@ -713,16 +805,35 @@ export default function App() {
     // A `to=` that names no real station is simply not a filter: the board
     // falls back to every departure rather than to an invented one.
     setDestination(slugs.to ? findStationBySlug(list, slugs.to) || null : null);
+    // The departure, on start-up and on Back / Forward only: a language
+    // switch re-resolves the station but is not a navigation. It is only
+    // ever looked for on the board of the station the URL names, so a
+    // link without one, or naming an unknown one, is not a link at all.
+    if (!withLink) return;
+    const link = linkFromUrl();
+    setMissingLink(false);
+    if (link && found) {
+      setPendingLink({ ...link, stationId: found.id });
+    } else {
+      setPendingLink(null);
+      setOpenId(null);
+      if (link !== null) clearLinkFromUrl();
+    }
   }, []);
 
   // Once the list is there, adopt whatever station the address bar names.
+  // Only the first list carries the departure; later ones are language
+  // switches.
+  const linkApplied = useRef(false);
   useEffect(() => {
-    if (stations) applyUrl(stations);
+    if (!stations) return;
+    applyUrl(stations, !linkApplied.current);
+    linkApplied.current = true;
   }, [stations, applyUrl]);
 
   // Back / forward: re-resolve, swap the board, no page reload.
   useEffect(() => {
-    const onPop = () => applyUrl(stationsRef.current);
+    const onPop = () => applyUrl(stationsRef.current, true);
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [applyUrl]);
@@ -733,7 +844,10 @@ export default function App() {
     setStation(picked);
     setDestination(null);
     setUnknownSlug('');
-    const url = new URL(window.location.href);
+    setOpenId(null);
+    setPendingLink(null);
+    setMissingLink(false);
+    const url = urlWithLink(null);
     url.searchParams.set(STATION_PARAM, stationToSlug(picked));
     writeStored(STORE_STATION, stationToSlug(picked));
     // Choosing a station is a request for that station's whole board.
@@ -748,7 +862,10 @@ export default function App() {
     setStation(origin);
     setDestination(target);
     setUnknownSlug('');
-    const url = new URL(window.location.href);
+    setOpenId(null);
+    setPendingLink(null);
+    setMissingLink(false);
+    const url = urlWithLink(null);
     url.searchParams.set(STATION_PARAM, stationToSlug(origin));
     url.searchParams.set(TO_PARAM, stationToSlug(target));
     // Only the origin is remembered; the From -> To filter is not.
@@ -788,7 +905,7 @@ export default function App() {
   // Back to the full board for the same station, without leaving it.
   const clearDestination = useCallback(() => {
     setDestination(null);
-    const url = new URL(window.location.href);
+    const url = urlWithLink(null);
     url.searchParams.delete(TO_PARAM);
     window.history.pushState(null, '', url);
   }, []);
@@ -804,7 +921,9 @@ export default function App() {
         ? (await mockSource()).getMockLiveboard(stationRef.current)
         : await getLiveboard(station.id, lang, signal);
       if (signal?.aborted || sequence !== refreshSequence.current) return;
-      setBoard(next);
+      // Tagged with the station it was fetched for, so a board that lands
+      // for the start-up default is never searched for a linked departure.
+      setBoard({ ...next, stationId: station.id });
       setError(null);
       lastGood.current = Date.now();
       setUpdatedAt(lastGood.current);
@@ -912,33 +1031,87 @@ export default function App() {
 
   // Merge the journeys into the departures and derive the shortened-route
   // flag: a run of cancelled stops at the end means the train turns back.
+  const withJourney = useCallback((d) => {
+    const stops = routesById[d.id]?.stops;
+    if (!stops?.length) return d;
+    const lastServed = [...stops].reverse().find((s) => !s.cancelled);
+    const shortened = Boolean(lastServed) && Boolean(stops.at(-1)?.cancelled);
+    return {
+      ...d,
+      intermediateStops: CONFIG.maxStops ? stops.slice(0, CONFIG.maxStops) : stops,
+      shortened,
+      shortenedAt: shortened ? lastServed.name : null,
+    };
+  }, [routesById]);
+
   const departures = useMemo(() => {
     if (!board) return [];
     const source = filtered ? filtered.matches : board.departures;
-    return source.slice(0, rows).map((d) => {
-      const stops = routesById[d.id]?.stops;
-      if (!stops?.length) return d;
-      const lastServed = [...stops].reverse().find((s) => !s.cancelled);
-      const shortened = Boolean(lastServed) && Boolean(stops.at(-1)?.cancelled);
-      return {
-        ...d,
-        intermediateStops: CONFIG.maxStops ? stops.slice(0, CONFIG.maxStops) : stops,
-        shortened,
-        shortenedAt: shortened ? lastServed.name : null,
-      };
-    });
-  }, [board, rows, routesById, filtered]);
+    return source.slice(0, rows).map(withJourney);
+  }, [board, rows, withJourney, filtered]);
 
   /* --- the opened train ------------------------------------------- */
 
-  const selectedDeparture = useMemo(
-    () => departures.find((d) => d.id === openId) || null,
-    [departures, openId]);
+  // Looked up on the whole board, not only the rows drawn: a linked train
+  // may sit below the row limit or outside the From -> To matches, and it
+  // is still a departure iRail returned.
+  const selectedDeparture = useMemo(() => {
+    if (!openId) return null;
+    const shown = departures.find((d) => d.id === openId);
+    if (shown) return shown;
+    const listed = board?.departures.find((d) => d.id === openId);
+    return listed ? withJourney(listed) : null;
+  }, [departures, board, openId, withJourney]);
 
-  // A closed overlay, or a departure that has left the board, closes it.
+  // A departure that has left the board closes the overlay, and the URL
+  // stops naming it.
   useEffect(() => {
-    if (openId && !selectedDeparture) setOpenId(null);
+    if (openId && !selectedDeparture) {
+      setOpenId(null);
+      clearLinkFromUrl();
+    }
   }, [openId, selectedDeparture]);
+
+  // The linked departure, looked for exactly once, on the first board of
+  // the station the URL names — scheduled time and train number, never
+  // the number alone. A departure that is not there is reported, and no
+  // other train is opened in its place.
+  useEffect(() => {
+    if (!pendingLink || !board || board.stationId !== pendingLink.stationId) return;
+    setPendingLink(null);
+    const match = board.departures.find((d) => sameLink(departureLink(d), pendingLink));
+    if (match) {
+      setOpenId(match.id);
+    } else {
+      setOpenId(null);
+      setMissingLink(true);
+      clearLinkFromUrl();
+    }
+  }, [pendingLink, board]);
+
+  // A row click: open it and give it a history entry of its own, marked
+  // so closing the panel can step back over it.
+  const openDeparture = useCallback((d) => {
+    setOpenId(d.id);
+    setPendingLink(null);
+    setMissingLink(false);
+    const link = departureLink(d);
+    if (!link) return;
+    window.history.pushState(
+      { ...(window.history.state || {}), trainDetails: true }, '', urlWithLink(link));
+  }, []);
+
+  // What Share hands on: the canonical link, from the row already on
+  // screen. No request is made for it.
+  const share = useMemo(() => {
+    const link = departureLink(selectedDeparture);
+    if (!link) return null;
+    const url = urlWithLink(link);
+    url.searchParams.set(STATION_PARAM, stationToSlug(station));
+    if (destination) url.searchParams.set(TO_PARAM, stationToSlug(destination));
+    else url.searchParams.delete(TO_PARAM);
+    return { url: url.href };
+  }, [selectedDeparture, station, destination]);
 
   // The route comes from the same cached, queued /vehicle call the board
   // already uses for its "via" list, so opening a listed train costs no
@@ -1077,11 +1250,21 @@ export default function App() {
     refitRows();
   }, [notice?.text, notice?.kind, destination, scanning, partial, rows, refitRows]);
 
+  // The missing-departure line is drawn as the board's first row, in a
+  // row's height, so on a fitted desktop board it takes one train's slot
+  // rather than pushing the last row out of the clipped board. The phone
+  // scrolls, so there it simply sits above every train.
+  const stacked = window.matchMedia(STACKED_QUERY).matches;
+  const boardDepartures = missingLink && !stacked
+    ? departures.slice(0, Math.max(0, rows - 1))
+    : departures;
+  const boardSlots = boardDepartures.length + (missingLink ? 1 : 0);
+
   useLayoutEffect(() => {
     const L = LAYOUTS[CONFIG.layout] || LAYOUTS.compact;
     const boardElement = screenRef.current?.querySelector(':scope > .departure-board');
     const boardHeight = boardElement?.clientHeight || 0;
-    const rendered = departures.length;
+    const rendered = boardSlots;
     // Enough slots that a half-empty board is not drawn as a few giant bands,
     // but never more than the fitted count: past it the extra slots would show
     // as blank space under the last train instead of filling the screen.
@@ -1092,7 +1275,7 @@ export default function App() {
       ? rows
       : Math.max(rendered, minimumSlots);
     document.documentElement.style.setProperty('--rows', fittedRows);
-  }, [departures.length, notice?.text, notice?.kind, destination, rows]);
+  }, [boardSlots, notice?.text, notice?.kind, destination, rows]);
 
   // What the board says when it has no rows to draw. With a destination
   // filter on, "no departures" would be wrong twice over: the station does
@@ -1111,8 +1294,23 @@ export default function App() {
             : t.noDirectUnconfirmed)
         : t.none;
 
+  // The removed button took focus with it; hand it to the first train.
+  const dismissMissingLink = useCallback(() => {
+    setMissingLink(false);
+    requestAnimationFrame(() => screenRef.current
+      ?.querySelector('.departure-row.is-openable, .topbar-pick')?.focus());
+  }, []);
   const closeStationPicker = useCallback(() => setPicking(false), []);
-  const closeTrainDetails = useCallback(() => setOpenId(null), []);
+  // An entry this session pushed for the panel is stepped back over, so
+  // Back and Close agree. A link opened directly has nothing of ours
+  // behind it — going back would leave the site — so its entry is
+  // rewritten to the plain board instead.
+  const closeTrainDetails = useCallback(() => {
+    setOpenId(null);
+    if (!new URLSearchParams(window.location.search).has(TRAIN_PARAM)) return;
+    if (window.history.state?.trainDetails) window.history.back();
+    else clearLinkFromUrl();
+  }, []);
   const openAbout = useCallback(() => setAbout(true), []);
   const closeAbout = useCallback(() => setAbout(false), []);
 
@@ -1161,12 +1359,14 @@ export default function App() {
       />
 
       <DepartureBoard
-        departures={departures}
+        departures={boardDepartures}
         layout={CONFIG.layout}
         viaStops={CONFIG.viaStops}
         t={t}
         empty={empty}
-        onOpen={(d) => setOpenId(d.id)}
+        notice={missingLink ? t.linkMissing : ''}
+        onDismissNotice={dismissMissingLink}
+        onOpen={openDeparture}
       />
 
       {(destination || notice) && (
@@ -1215,6 +1415,7 @@ export default function App() {
         layout={CONFIG.layout}
         viaStops={CONFIG.viaStops}
         t={t}
+        share={share}
         onClose={closeTrainDetails}
       />
 
@@ -1234,6 +1435,9 @@ export default function App() {
       <AboutModal open={about} t={t} onClose={closeAbout} />
 
       <div className="sr-only" role="alert">{error ? t.offline : ''}</div>
+      {/* Set once when a linked departure is not found; the board's own
+          refreshes never change it, so it is read once. */}
+      <div className="sr-only" role="status">{missingLink ? t.linkMissing : ''}</div>
     </div>
   );
 }

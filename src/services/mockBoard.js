@@ -20,8 +20,10 @@
 // module, not to `Date.now()` at call time: a departure's identity is its
 // vehicle plus its scheduled time, so a moving base would hand every 30 s
 // refresh a new set of ids, remounting every row and closing an open
-// overlay.
-const BASE = new Date(Math.floor(Date.now() / 60000) * 60000);
+// overlay. Rounded to the quarter hour so a deep link copied from the mock
+// board still names the same departure after a reload.
+const QUARTER = 15 * 60000;
+const BASE = new Date(Math.floor(Date.now() / QUARTER) * QUARTER);
 
 const at = (minutes) => new Date(BASE.getTime() + minutes * 60000);
 

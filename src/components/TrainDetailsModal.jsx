@@ -257,7 +257,7 @@ function TrainPerformance({ performance, t, id }) {
 }
 
 export default function TrainDetailsModal({
-  departure, route, loading, performance, stationId, layout, viaStops, t, onClose,
+  departure, route, loading, performance, stationId, layout, viaStops, t, share, onClose,
 }) {
   // Which stop the phone has opened. Desktop uses hover instead, so this
   // stays null there; either way only one stop is ever active.
@@ -271,6 +271,13 @@ export default function TrainDetailsModal({
   // not a view: it adds no layer to the Escape ladder and no second
   // "back" control — the panel still has exactly one way out.
   const [perfOpen, setPerfOpen] = useState(false);
+  // What the last Share did: null, 'copied', or 'failed' — the last one
+  // shows the link itself to copy by hand.
+  const [shareState, setShareState] = useState(null);
+  const shareStateRef = useRef(null);
+  shareStateRef.current = shareState;
+  const manualRef = useRef(null);
+  const shareId = useId();
   // No extra lookup: `train` / `trainNumber` are the normalised identity
   // the board row already prints.
   const trainLabel = [departure?.train, departure?.trainNumber]
@@ -330,13 +337,15 @@ export default function TrainDetailsModal({
     setMapOpen(false);
     setInfoOpen(false);
     setPerfOpen(false);
+    setShareState(null);
     const id = requestAnimationFrame(() => closeRef.current?.focus());
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         // One layer per press, outermost first: the accuracy note, then
         // the map, then the overlay itself.
-        if (infoOpenRef.current) setInfoOpen(false);
+        if (shareStateRef.current) setShareState(null);
+        else if (infoOpenRef.current) setInfoOpen(false);
         else if (mapOpenRef.current) closeMap();
         else onClose();
         return;
@@ -362,11 +371,49 @@ export default function TrainDetailsModal({
       document.body.classList.remove('modal-open');
       const opener = openerRef.current;
       requestAnimationFrame(() => {
-        if (opener?.isConnected) opener.focus?.();
+        // A panel opened from a shared link had no row behind it: the
+        // body was focused then, and the fallback below is the safe one.
+        if (opener?.isConnected && opener !== document.body) opener.focus?.();
         else document.querySelector('.departure-row.is-openable, .topbar-pick')?.focus?.();
       });
     };
   }, [open, onClose, closeMap]);
+
+  // The copied note goes away by itself; a failure stays until dismissed,
+  // since it carries the link to copy.
+  useEffect(() => {
+    if (shareState !== 'copied') return undefined;
+    const id = setTimeout(() => setShareState(null), 2500);
+    return () => clearTimeout(id);
+  }, [shareState]);
+
+  useEffect(() => {
+    if (shareState === 'failed') manualRef.current?.select();
+  }, [shareState]);
+
+  // The system share sheet where there is one, the clipboard otherwise,
+  // and the link itself, selected, when neither works. Dismissing the
+  // share sheet is a choice, not a failure.
+  const shareDeparture = useCallback(async () => {
+    if (!share) return;
+    setInfoOpen(false);
+    if (typeof navigator.share === 'function') {
+      try {
+        // The link alone: with a title or text beside it, the system
+        // sheet's Copy puts the description on the clipboard as well.
+        await navigator.share({ url: share.url });
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(share.url);
+      setShareState('copied');
+    } catch {
+      setShareState('failed');
+    }
+  }, [share]);
 
   if (!open) return null;
 
@@ -437,6 +484,44 @@ export default function TrainDetailsModal({
                 )}
               </>
             )}
+            {share && (
+              <button
+                type="button"
+                className="topbar-pick train-share"
+                onClick={shareDeparture}
+                aria-label={t.share}
+                aria-controls={shareState ? shareId : undefined}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3.5v11" />
+                  <polyline points="7.5,8 12,3.5 16.5,8" />
+                  <path d="M8 11H6.5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.5H16" />
+                </svg>
+              </button>
+            )}
+            {shareState && share && (
+              <div className="train-info__panel train-share__panel" id={shareId}>
+                {shareState === 'copied' ? (
+                  <p className="train-info__text">{t.shareCopied}</p>
+                ) : (
+                  <>
+                    <p className="train-info__text">{t.shareFailed}</p>
+                    <input
+                      ref={manualRef}
+                      className="train-share__url"
+                      type="url"
+                      readOnly
+                      value={share.url}
+                      aria-label={t.shareLink}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+            <p className="sr-only" role="status">
+              {shareState === 'copied' ? t.shareCopied : shareState === 'failed' ? t.shareFailed : ''}
+            </p>
             <button
               type="button"
               className="topbar-pick train-close"

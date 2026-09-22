@@ -603,12 +603,23 @@ thing on the board. Everything else is live iRail.
   `stationId` / `stationName` / `stationSlug` state.
 - History is native `history.pushState` plus a `popstate` listener. Do
   not add a router unless the app genuinely grows real routes.
-- Update only the `station` and `to` parameters via `URL` /
+- Update only the `station`, `to`, `train` and `dep` parameters via `URL` /
   `URLSearchParams`; leave every other query parameter untouched.
 - `to=` is the direct-train filter's destination, and it is a slug on the
   same terms as `station=`: derived with `stationToSlug()`, resolved with
   `findStationBySlug()`, never an id and never reconstructed into one. An
   unresolvable `to=` is simply no filter, not an invented station.
+- An open Train Details view is addressable as `train=<trainNumber>&dep=<scheduled
+  Unix seconds>` next to `station` (and `to`, if set). Identity is the
+  number **and** the exact scheduled time on the board of the station the
+  URL names — never the number alone, never the delayed time. The link is
+  one-shot: `pendingLink` is consumed by the first board tagged with that
+  station's id, found or not, so a refresh never reopens a closed panel.
+  A row click pushes an entry marked `history.state.trainDetails`; closing
+  steps back over it, and a directly opened link is closed with
+  `replaceState` instead. A departure not on the board opens nothing and
+  shows one board-row-high notice above the first train; no request is
+  made to look for it.
 - Route filtering is direct trains only: a departure qualifies when its
   own `/vehicle` journey, sliced to the stops after this station, calls at
   the destination. Match on canonical station identity (`id`, then
