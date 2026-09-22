@@ -49,6 +49,7 @@ export default function Header({
   languages = [], lang, onLanguage, languageLabel,
   fullscreenLabel, fullscreenExitLabel,
   kiosk = false, kioskLabel, onKiosk,
+  boardMode = 'departures', boardLabels = {}, boardPickLabel, onBoard, onBoardMenu,
   menuLabel, aboutLabel, onAbout, legalLabel, onLegal,
   stationLabel, updatedLabel, updatedAt,
 }) {
@@ -59,6 +60,12 @@ export default function Header({
   const wrapRef = useRef(null);
   const menuBtnRef = useRef(null);
   const menuRef = useRef(null);
+  // The board menu: the centred title opens it, and it chooses between
+  // Departures and Arrivals. It stays in the bar in kiosk mode.
+  const [boardOpen, setBoardOpen] = useState(false);
+  const [boardPos, setBoardPos] = useState(null);
+  const boardBtnRef = useRef(null);
+  const boardMenuRef = useRef(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -115,8 +122,59 @@ export default function Header({
     };
   }, [menuOpen, closeMenu]);
 
+  const closeBoard = useCallback(({ restoreFocus = true } = {}) => {
+    setBoardOpen(false);
+    if (restoreFocus) requestAnimationFrame(() => boardBtnRef.current?.focus());
+  }, []);
+
+  // App needs to know, synchronously, that Escape belongs to this menu
+  // while it is open — kiosk mode would otherwise take the same key.
+  useLayoutEffect(() => {
+    onBoardMenu?.(boardOpen);
+    return () => onBoardMenu?.(false);
+  }, [boardOpen, onBoardMenu]);
+
+  // Centred under the title, measured like the overflow menu is.
+  useLayoutEffect(() => {
+    if (!boardOpen) return undefined;
+    const place = () => {
+      const r = boardBtnRef.current?.getBoundingClientRect();
+      if (r) setBoardPos({ top: r.bottom + 6, left: r.left + r.width / 2 });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [boardOpen]);
+
+  // Focus lands on the board on screen, so Enter keeps it.
+  useEffect(() => {
+    if (!boardOpen || !boardPos) return undefined;
+    const id = requestAnimationFrame(() => (
+      boardMenuRef.current?.querySelector('[aria-checked="true"]')
+        || boardMenuRef.current?.querySelector(MENU_ITEMS))?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [boardOpen, boardPos]);
+
+  useEffect(() => {
+    if (!boardOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeBoard(); }
+    };
+    const onDown = (e) => {
+      if (!boardBtnRef.current?.contains(e.target) && !boardMenuRef.current?.contains(e.target)) {
+        closeBoard({ restoreFocus: false });
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [boardOpen, closeBoard]);
+
   const onMenuKeyDown = (e) => {
-    const items = [...(menuRef.current?.querySelectorAll(MENU_ITEMS) ?? [])];
+    const items = [...(e.currentTarget.querySelectorAll(MENU_ITEMS) ?? [])];
     const index = items.indexOf(document.activeElement);
     let next = null;
     if (e.key === 'ArrowDown') next = items[(index + 1 + items.length) % items.length];
@@ -137,7 +195,52 @@ export default function Header({
         <span className="topbar-clock">{clockFormat.format(now)}</span>
         <span className="topbar-station">{station}</span>
       </div>
-      <div className="topbar-title">{title}</div>
+      {/* The board's title is also its switch: one button that looks like
+          the title, with a chevron in a slot reserved on both sides, so the
+          words stay on the bar's centre line whatever the chevron does. */}
+      <div className="topbar-title topbar-title--board">
+        <button
+          ref={boardBtnRef}
+          type="button"
+          className={`topbar-board${boardOpen ? ' is-on' : ''}`}
+          onClick={() => (boardOpen ? closeBoard() : setBoardOpen(true))}
+          aria-haspopup="menu"
+          aria-expanded={boardOpen}
+          aria-label={`${boardPickLabel}: ${title}`}
+        >
+          <span className="topbar-board__label">{title}</span>
+          <svg className="topbar-board__chevron" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      </div>
+
+      {boardOpen && boardPos && (
+        <div
+          ref={boardMenuRef}
+          className="topbar-menu topbar-menu--board"
+          role="menu"
+          aria-label={boardPickLabel}
+          onKeyDown={onMenuKeyDown}
+          style={{ top: boardPos.top, left: boardPos.left }}
+        >
+          {['departures', 'arrivals'].map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="menuitemradio"
+              aria-checked={mode === boardMode}
+              className="topbar-menu-item topbar-menu-item--row"
+              onClick={() => { closeBoard(); onBoard?.(mode); }}
+            >
+              <svg className="topbar-menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+                {mode === boardMode && <polyline points="5 12.5 10 17.5 19 7" />}
+              </svg>
+              {boardLabels[mode]}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="topbar-right">
         {updatedTime && (
           <span className="topbar-updated">{`${updatedLabel} ${updatedTime}`}</span>

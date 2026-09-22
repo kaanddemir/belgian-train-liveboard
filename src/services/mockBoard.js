@@ -203,6 +203,23 @@ const TRAINS = [
     ],
   },
   {
+    // ends its run here: an arrival only, never on the departures board
+    train: 'IC', number: '2514', destination: null, arrivalOnly: true,
+    minutes: 6, delay: 4, platform: '5',
+    before: [
+      ['Ostende', -80], ['Bruges', -65], ['Gand-Saint-Pierre', -40],
+      ['Bruxelles-Midi', -4],
+    ],
+    after: [],
+  },
+  {
+    // starts its run here: a departure only, never on the arrivals board
+    train: 'S5', number: '5125', destination: 'Grammont', minutes: 11,
+    platform: '8',
+    before: [],
+    after: [['Bruxelles-Midi', 15], ['Denderleeuw', 32], ['Grammont', 50]],
+  },
+  {
     train: 'S1', number: '1873', destination: 'Nivelles', minutes: 36,
     platform: '4',
     before: [['Anvers-Central', -55], ['Bruxelles-Nord', 34]],
@@ -238,13 +255,17 @@ function mockStop([name, minutes, cancelled = false], delay, id = '', occupancy 
 }
 
 // The shape `normalizeDeparture()` produces, in `getLiveboard()` order.
-function mockDeparture(t) {
+// An arrival is the same train seen from the other side: it gets in a
+// minute before it leaves (as `mockStop` has it), and the station the row
+// names is where it came from.
+function mockDeparture(t, arrival = false) {
   const id = vehicleId(t);
-  const time = at(t.minutes);
+  const time = at(arrival ? t.minutes - 1 : t.minutes);
   return {
     id: `${id}|${Math.floor(time.getTime() / 1000)}`,
     time,
-    destination: t.destination,
+    destination: arrival ? t.before[0][0] : t.destination,
+    arrival,
     train: t.train,
     trainNumber: t.number,
     vehicleId: id,
@@ -270,22 +291,30 @@ const routeCache = new Map();
 
 // Stands in for getLiveboard(): the station keeps its real name, so
 // ?mock=1 and ?station= describe the same board together.
-export function getMockLiveboard(station) {
+// Arrivals list every train that came from somewhere; departures every
+// train that goes on.
+export function getMockLiveboard(station, mode = 'departures') {
+  const arrival = mode === 'arrivals';
+  const trains = arrival
+    ? TRAINS.filter((t) => t.before?.length)
+    : TRAINS.filter((t) => !t.arrivalOnly);
   return {
     station: station?.name || 'Bruxelles-Central',
     alerts: [],
-    departures: TRAINS.map(mockDeparture).sort((a, b) => a.time - b.time),
+    departures: trains.map((t) => mockDeparture(t, arrival)).sort((a, b) => a.time - b.time),
   };
 }
 
-// Stands in for getStops(): the inline "via" list, this station onwards.
-export function getMockStops(id, afterTime) {
+// Stands in for getStops(): the inline "via" list, this station onwards,
+// or — `direction` 'before' — origin up to this station.
+export function getMockStops(id, afterTime, direction = 'after') {
   const t = byVehicle.get(id);
   if (!t || t.journey === false) return null;
-  const key = `${id}|${afterTime.getTime()}`;
+  const before = direction === 'before';
+  const key = `${id}|${afterTime.getTime()}|${direction}`;
   if (!stopsCache.has(key)) {
-    const stops = t.after.map((s) => mockStop(s, t.delay ?? 0));
-    stopsCache.set(key, stops.filter((s) => s.time > afterTime));
+    const stops = (before ? t.before : t.after).map((s) => mockStop(s, t.delay ?? 0));
+    stopsCache.set(key, stops.filter((s) => (before ? s.time < afterTime : s.time > afterTime)));
   }
   return stopsCache.get(key);
 }

@@ -53,6 +53,10 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
 
 Screenshots show Bruxelles-Central; displayed services vary with the current liveboard. The two Train Details images are captured from the development fixture board (`?mock=1`), so the Historical Performance section is visible without a published aggregate.
 
+### Arrivals
+
+The board opens on Departures. Click or tap the board title (**Departures**) to switch to **Arrivals**, or add `board=arrivals` to the URL — for example `?station=brussel-centraal&board=arrivals`. Arrival rows show where each train comes from and its scheduled arrival time. The From → To filter is a departures feature, so choosing it returns to Departures. `board=arrivals` works together with `kiosk=1`.
+
 ### Kiosk mode
 
 Choose **Kiosk mode** from the three-dot menu or add `?kiosk=1` to the URL. Search and the menu are hidden, the mouse cursor hides after a few idle seconds, and supported browsers keep the screen awake. Press Escape to leave kiosk mode.

@@ -57,7 +57,16 @@ function Badge({ departure, t }) {
   return null;
 }
 
-// Destination in yellow, followed inline by "via A, B, C" in white.
+// The stations a row prints after "via". A departure's stops run on to
+// the terminus, which the row already names, so the last one is dropped;
+// an arrival's run back to the origin, so the first one is.
+function viaOf(departure) {
+  const stops = departure.intermediateStops ?? [];
+  return departure.arrival ? stops.slice(1) : stops.slice(0, -1);
+}
+
+// Destination in yellow, followed inline by "via A, B, C" in white. On the
+// arrivals board the yellow station is the origin.
 function MainLine({ departure, viaStops, t }) {
   const dest = <span className="departure-row__destination">{departure.destination}</span>;
 
@@ -68,7 +77,7 @@ function MainLine({ departure, viaStops, t }) {
     return <>{dest} <span className="departure-row__via">{t.limitedTo(departure.shortenedAt)}</span></>;
   }
   // The overview prints a few intermediate stations, never the terminus.
-  const via = (departure.intermediateStops ?? []).slice(0, -1);
+  const via = viaOf(departure);
   if (!via.length) return dest;
   return (
     <>
@@ -106,7 +115,8 @@ function SecondLine({ departure, t }) {
   if (departure.extra) {
     return <div className="band band--notice">{t.extra}</div>;
   }
-  const stops = departure.intermediateStops;
+  // "This train stops at" is a forward list: an arrival has none to give.
+  const stops = departure.arrival ? null : departure.intermediateStops;
   if (!stops?.length) return null;
   return <div className="departure-row__stops">{t.stops} {stopList(stops)}.</div>;
 }
@@ -146,8 +156,10 @@ function rowClass(departure, open) {
 // details. Enter fires on keydown, Space on keyup, as buttons do.
 function openProps(departure, t, open) {
   if (!open) return {};
-  const via = (departure.intermediateStops ?? []).slice(0, -1);
-  const parts = [formatTime(departure.time), departure.destination].filter(Boolean);
+  const via = viaOf(departure);
+  const station = departure.arrival && departure.destination
+    ? t.fromStation(departure.destination) : departure.destination;
+  const parts = [formatTime(departure.time), station].filter(Boolean);
   if (via.length) {
     const shown = via.slice(0, 3).map((stop) => stop.name).join(', ');
     parts.push(`${t.via} ${shown}${via.length > 3 ? ', …' : ''}`);

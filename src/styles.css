@@ -383,6 +383,78 @@ body{
   padding-block:.15em;
   margin-block:-.15em;
 }
+/* --- the board title, which is also the Departures / Arrivals switch --
+   It keeps the title's look: no box, no pill. The chevron sits in an
+   inline slot reserved on *both* sides, so the words never leave the
+   bar's centre line — not when the chevron shows, not when the menu
+   opens, not when the title changes. The title itself stops clipping so
+   the focus ring can sit outside the button; the label ellipsises
+   instead. */
+.topbar-title--board{
+  overflow:visible;
+  display:flex;
+  justify-content:center;
+  padding-block:0;
+  margin-block:0;
+}
+.topbar-board{
+  --board-chevron:.5em;
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  min-width:0;
+  padding:0 calc(var(--board-chevron) + var(--space-2));
+  border:0;
+  border-radius:var(--radius-sm);
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  line-height:1;
+  cursor:pointer;
+}
+.topbar-board__label{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  /* the descender room the plain title keeps, here on the clipping box */
+  padding-block:.15em;
+}
+.topbar-board__chevron{
+  position:absolute;
+  right:0;
+  top:50%;
+  width:var(--board-chevron);
+  height:var(--board-chevron);
+  transform:translateY(-50%);
+  fill:none;
+  stroke:currentColor;
+  stroke-width:3;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  /* always faintly there, so a touch screen can find it */
+  opacity:.55;
+  transition:opacity var(--transition-fast);
+}
+/* A mouse can find it by hovering: until then the title reads as before. */
+@media (hover:hover) and (pointer:fine){
+  .topbar-board__chevron{ opacity:0; }
+}
+.topbar-board:hover .topbar-board__chevron,
+.topbar-board:focus-visible .topbar-board__chevron,
+.topbar-board.is-on .topbar-board__chevron{ opacity:1; }
+.topbar-board:active{ opacity:.85; }
+.topbar-board:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
+}
+/* centred under the title; Header.jsx measures the centre */
+.topbar-menu--board{
+  min-width:10em;
+  transform:translateX(-50%);
+}
+
 .topbar-right{
   justify-self:end;
   display:flex;
@@ -2537,6 +2609,7 @@ body.modal-open{ overflow:hidden; }
   /* width comes from --control-size above; the height is held at the
      44px tap target the phone needs */
   .topbar > .topbar-right .topbar-pick{ height:44px; }
+  .topbar-board{ min-height:44px; }
   .topbar > .topbar-right .topbar-pick svg{
     width:clamp(15px, 4vw, 18px);
     height:clamp(15px, 4vw, 18px);
@@ -3026,6 +3099,7 @@ body.modal-open{ overflow:hidden; }
   .station-swap,
   .notice__clear,
   .topbar-pick,
+  .topbar-board__chevron,
   .topbar-menu-item,
   .train-stop__node,
   .train-stop::after,

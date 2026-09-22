@@ -248,7 +248,12 @@ function vehicleLabel(info) {
   return { train: shortname, trainNumber: info?.number || '' };
 }
 
-function normalizeDeparture(d, lang, index) {
+// One row of either board. On a departures board `stationinfo` is where
+// the train is going and `time` is its scheduled departure; on an arrivals
+// board the same fields are where it came from and its scheduled arrival.
+// The row keeps one shape — `destination` is simply the station the row is
+// about — and `arrival` says which reading applies.
+function normalizeDeparture(d, lang, index, arrival = false) {
   const platform = d.platforminfo?.name ?? d.platform ?? null;
   const vehicleId = d.vehicleinfo?.name || d.vehicle || '';
   const time = parseUnixSeconds(d.time);
@@ -260,15 +265,18 @@ function normalizeDeparture(d, lang, index) {
     : `malformed|${destination}|${label.train}|${platform || ''}|${index}`;
   return {
     id,
-    time,                                          // scheduled departure
-    destination,
+    time,                                  // scheduled departure, or arrival
+    destination,                           // the origin on an arrivals board
+    arrival,
     ...label,
     vehicleId,
     platform: platform && platform !== '?' ? platform : null,
     platformChanged: d.platforminfo ? !bool(d.platforminfo.normal) : false,
     delay: Math.round(num(d.delay) / 60),          // minutes
     cancelled: bool(d.canceled),
-    left: bool(d.left),
+    // `left` on a departures board, `arrived` on an arrivals board: either
+    // way the train is no longer coming and drops off the board.
+    left: bool(arrival ? d.arrived : d.left),
     extra: bool(d.isExtra),
     intermediateStops: null,                       // filled in by getStops()
   };
@@ -291,17 +299,20 @@ const isStationId = (v) => /^BE\.NMBS\.\d+$/.test(v);
 
 // High priority: this is the request that decides what is on screen, so
 // it takes the next free slot rather than queueing behind a route scan.
-export async function getLiveboard(station, lang = 'nl', signal) {
+// `mode` is 'departures' (the default) or 'arrivals': the same request,
+// asked with the other `arrdep`, answered under the other key.
+export async function getLiveboard(station, lang = 'nl', signal, mode = 'departures') {
+  const arrival = mode === 'arrivals';
   const json = await request('/liveboard', {
     ...(isStationId(station) ? { id: station } : { station }),
-    arrdep: 'departure', alerts: 'true', lang,
+    arrdep: arrival ? 'arrival' : 'departure', alerts: 'true', lang,
   }, { priority: 'high', signal });
-  const raw = asArray(json?.departures?.departure);
+  const raw = asArray(arrival ? json?.arrivals?.arrival : json?.departures?.departure);
   return {
     station: stationName(json?.stationinfo, json?.station, lang) || station,
     alerts: extractAlerts(json),
     departures: raw
-      .map((d, index) => normalizeDeparture(d, lang, index))
+      .map((d, index) => normalizeDeparture(d, lang, index, arrival))
       .filter(Boolean)
       .filter((t) => !t.left)
       .sort((a, b) => a.time - b.time),
@@ -461,19 +472,27 @@ const UNAVAILABLE = { status: 'unavailable', stops: null };
 const FAILED = { status: 'failed', stops: null };
 
 // Intermediate stations of one train, from this station up to the
-// terminus — what the board prints inline. The slice is memoised as well
+// terminus — what the board prints inline. An arrivals board asks for the
+// other side (`direction` 'before'): origin up to, not including, this
+// station, still in travel order. Both are slices of the one journey. The slice is memoised as well
 // as the journey: the board compares stop lists by identity on every
 // 30 s refresh, and a fresh array each time would re-render for nothing.
 // The two constants above are shared for the same reason.
-export function getStops(vehicleId, afterTime, lang = 'nl') {
+export function getStops(vehicleId, afterTime, lang = 'nl', direction = 'after') {
   if (!vehicleId) return Promise.resolve(UNAVAILABLE);
   const service = serviceDay(afterTime);
-  const key = `${vehicleId}|${afterTime.getTime()}|${lang}`;
+  const before = direction === 'before';
+  const key = `${vehicleId}|${afterTime.getTime()}|${lang}${before ? '|before' : ''}`;
   if (!sliceCache.has(key)) {
     let slice;
     slice = getJourney(vehicleId, afterTime, lang)
       .then((stops) => (stops
-        ? { status: 'ok', stops: stops.filter((s) => s.time > afterTime) }
+        ? {
+          status: 'ok',
+          stops: stops.filter((s) => (before
+            ? s.time && s.time < afterTime
+            : s.time > afterTime)),
+        }
         : UNAVAILABLE))
       .catch(() => {
         // Transient: drop the entry so a later call retries it. No retry

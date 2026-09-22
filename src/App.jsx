@@ -42,6 +42,29 @@ const TO_PARAM = 'to';
 // and a delay never changes it.
 const TRAIN_PARAM = 'train';
 const DEP_PARAM = 'dep';
+// The same identity on the arrivals board: the train number and its
+// scheduled *arrival* here. Never written into `dep`, which keeps meaning
+// a departure.
+const ARR_PARAM = 'arr';
+
+// Which board: no parameter is Departures, and only the exact value
+// `arrivals` is the other one. `board=departures` is never written — any
+// value other than `arrivals` is cleaned out of the URL.
+const BOARD_PARAM = 'board';
+const DEPARTURES = 'departures';
+const ARRIVALS = 'arrivals';
+const boardFromUrl = () =>
+  (new URLSearchParams(window.location.search).get(BOARD_PARAM) === ARRIVALS
+    ? ARRIVALS : DEPARTURES);
+
+// Drop a non-canonical `board` value from the current entry, in place.
+function cleanBoardParam() {
+  const url = new URL(window.location.href);
+  const value = url.searchParams.get(BOARD_PARAM);
+  if (value === null || value === ARRIVALS) return;
+  url.searchParams.delete(BOARD_PARAM);
+  window.history.replaceState(window.history.state, '', url);
+}
 const TRAIN_PATTERN = /^[A-Za-z0-9]{1,12}$/;
 // 2001-09-09 .. 2100-01-01: anything outside is not a departure time.
 const DEP_MIN = 1_000_000_000;
@@ -157,6 +180,17 @@ const DATE_LOCALES = { nl: 'nl-BE', fr: 'fr-BE', en: 'en-GB', de: 'de-DE' };
 const TEXT = {
   nl: {
     title: 'Vertrek',
+    boardDepartures: 'Vertrek',
+    boardArrivals: 'Aankomst',
+    boardPick: 'Bord kiezen',
+    fromStation: (s) => `van ${s}`,
+    // What changes on the arrivals board; merged over the rest.
+    arrivalBoard: {
+      title: 'Aankomst',
+      none: 'Geen aankomende treinen',
+      shareLink: 'Link naar deze aankomst',
+      linkMissing: 'Deze aankomst staat niet meer op het bord',
+    },
     via: 'via',
     platform: 'Spoor',
     stops: 'Deze trein stopt te:',
@@ -264,6 +298,17 @@ const TEXT = {
   },
   fr: {
     title: 'Départ',
+    boardDepartures: 'Départ',
+    boardArrivals: 'Arrivée',
+    boardPick: 'Choisir le tableau',
+    fromStation: (s) => `en provenance de ${s}`,
+    // What changes on the arrivals board; merged over the rest.
+    arrivalBoard: {
+      title: 'Arrivée',
+      none: 'Aucune arrivée',
+      shareLink: 'Lien vers cette arrivée',
+      linkMissing: 'Cette arrivée n’est plus affichée',
+    },
     via: 'via',
     platform: 'Voie',
     stops: "Ce train s'arrête à :",
@@ -371,6 +416,17 @@ const TEXT = {
   },
   en: {
     title: 'Departures',
+    boardDepartures: 'Departures',
+    boardArrivals: 'Arrivals',
+    boardPick: 'Choose board',
+    fromStation: (s) => `from ${s}`,
+    // What changes on the arrivals board; merged over the rest.
+    arrivalBoard: {
+      title: 'Arrivals',
+      none: 'No arrivals',
+      shareLink: 'Link to this arrival',
+      linkMissing: 'This arrival is no longer on the board',
+    },
     via: 'via',
     platform: 'Platform',
     stops: 'This train calls at:',
@@ -478,6 +534,17 @@ const TEXT = {
   },
   de: {
     title: 'Abfahrt',
+    boardDepartures: 'Abfahrt',
+    boardArrivals: 'Ankunft',
+    boardPick: 'Tafel wählen',
+    fromStation: (s) => `aus ${s}`,
+    // What changes on the arrivals board; merged over the rest.
+    arrivalBoard: {
+      title: 'Ankunft',
+      none: 'Keine Ankünfte',
+      shareLink: 'Link zu dieser Ankunft',
+      linkMissing: 'Diese Ankunft steht nicht mehr auf der Tafel',
+    },
     via: 'über',
     platform: 'Gleis',
     stops: 'Dieser Zug hält in:',
@@ -684,39 +751,44 @@ function slugsFromUrl() {
 
 // The departure named in the address bar: null when there is none,
 // `false` when the parameters are there but not a departure identity.
-function linkFromUrl() {
+// On the arrivals board the time is read from `arr`, never from `dep`.
+function linkFromUrl(mode = boardFromUrl()) {
   const params = new URLSearchParams(window.location.search);
   const train = params.get(TRAIN_PARAM);
-  const dep = params.get(DEP_PARAM);
-  if (train === null && dep === null) return null;
-  const seconds = /^\d{10}$/.test(dep ?? '') ? Number(dep) : NaN;
+  const own = params.get(mode === ARRIVALS ? ARR_PARAM : DEP_PARAM);
+  const other = params.get(mode === ARRIVALS ? DEP_PARAM : ARR_PARAM);
+  if (train === null && own === null && other === null) return null;
+  const seconds = /^\d{10}$/.test(own ?? '') ? Number(own) : NaN;
   return TRAIN_PATTERN.test(train ?? '') && seconds >= DEP_MIN && seconds <= DEP_MAX
-    ? { train, dep: seconds }
+    ? { train, at: seconds, mode }
     : false;
 }
 
 // The same identity for a departure on the board. The train number is
 // `vehicleLabel()`'s; only a label it could not split falls back to the
 // last segment of the vehicle id. A row without a vehicle is not linkable.
+// An arrival row's time is its scheduled arrival, so its link is an `arr`.
 function departureLink(departure) {
   if (!departure?.vehicleId || !(departure.time instanceof Date)) return null;
   const train = departure.trainNumber || departure.vehicleId.split('.').pop();
-  const dep = Math.floor(departure.time.getTime() / 1000);
-  return TRAIN_PATTERN.test(train) && Number.isFinite(dep) ? { train, dep } : null;
+  const at = Math.floor(departure.time.getTime() / 1000);
+  const mode = departure.arrival ? ARRIVALS : DEPARTURES;
+  return TRAIN_PATTERN.test(train) && Number.isFinite(at) ? { train, at, mode } : null;
 }
 
-const sameLink = (a, b) => Boolean(a && b) && a.train === b.train && a.dep === b.dep;
+const sameLink = (a, b) => Boolean(a && b)
+  && a.train === b.train && a.at === b.at && a.mode === b.mode;
 
 // The current URL with the departure set, or removed when `link` is null.
 // Every other parameter (`station`, `to`, `mock`, ...) is left as it is.
 function urlWithLink(link) {
   const url = new URL(window.location.href);
+  url.searchParams.delete(TRAIN_PARAM);
+  url.searchParams.delete(DEP_PARAM);
+  url.searchParams.delete(ARR_PARAM);
   if (link) {
     url.searchParams.set(TRAIN_PARAM, link.train);
-    url.searchParams.set(DEP_PARAM, String(link.dep));
-  } else {
-    url.searchParams.delete(TRAIN_PARAM);
-    url.searchParams.delete(DEP_PARAM);
+    url.searchParams.set(link.mode === ARRIVALS ? ARR_PARAM : DEP_PARAM, String(link.at));
   }
   return url;
 }
@@ -731,7 +803,7 @@ function stateWithoutDetails() {
 // Drop the departure from the current entry without adding one.
 function clearLinkFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  if (!params.has(TRAIN_PARAM) && !params.has(DEP_PARAM)) return;
+  if (!params.has(TRAIN_PARAM) && !params.has(DEP_PARAM) && !params.has(ARR_PARAM)) return;
   window.history.replaceState(stateWithoutDetails(), '', urlWithLink(null));
 }
 
@@ -765,6 +837,8 @@ export default function App() {
   // which informational panel is open, if any: 'about' | 'legal'
   const [info, setInfo] = useState(null);
   const [kiosk, setKiosk] = useState(kioskFromUrl);
+  // 'departures' | 'arrivals', mirrored from the URL like `kiosk`.
+  const [boardMode, setBoardMode] = useState(boardFromUrl);
   // Only the id of the opened departure: the departure itself is derived
   // from the live list below, so it keeps refreshing while the overlay is
   // open instead of freezing a copy.
@@ -818,7 +892,10 @@ export default function App() {
   const noticeRef = useRef(null);
   const screenRef = useRef(null);
   // One language throughout: the fixed wording, and what iRail is asked for.
-  const t = TEXT[lang];
+  // The arrivals board overrides only the few lines that name a departure.
+  const t = useMemo(() => (boardMode === ARRIVALS
+    ? { ...TEXT[lang], ...TEXT[lang].arrivalBoard }
+    : TEXT[lang]), [lang, boardMode]);
 
   // Picking a language is a deliberate choice, so it outlives the session.
   const selectLanguage = useCallback((code) => {
@@ -847,6 +924,8 @@ export default function App() {
   // list; an id is never derived from the slug itself. Unknown slugs fall
   // back to the default station and say so in the notice strip.
   const applyUrl = useCallback((list, withLink) => {
+    cleanBoardParam();
+    setBoardMode(boardFromUrl());
     const slugs = slugsFromUrl();
     const found = slugs.station ? findStationBySlug(list, slugs.station) : null;
     // The address bar always wins. Only when it names no station does the
@@ -887,7 +966,12 @@ export default function App() {
 
   // Back / forward: re-resolve, swap the board, no page reload.
   useEffect(() => {
-    const onPop = () => { setKiosk(kioskFromUrl()); applyUrl(stationsRef.current, true); };
+    const onPop = () => {
+      setKiosk(kioskFromUrl());
+      cleanBoardParam();
+      setBoardMode(boardFromUrl());
+      applyUrl(stationsRef.current, true);
+    };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [applyUrl]);
@@ -922,6 +1006,9 @@ export default function App() {
     const url = urlWithLink(null);
     url.searchParams.set(STATION_PARAM, stationToSlug(origin));
     url.searchParams.set(TO_PARAM, stationToSlug(target));
+    // From -> To is a departures question: it always lands on Departures.
+    url.searchParams.delete(BOARD_PARAM);
+    setBoardMode(DEPARTURES);
     // Only the origin is remembered; the From -> To filter is not.
     writeStored(STORE_STATION, stationToSlug(origin));
     window.history.pushState(null, '', url);
@@ -964,6 +1051,27 @@ export default function App() {
     window.history.pushState(null, '', url);
   }, []);
 
+  // Departures <-> Arrivals: a view change with its own history entry.
+  // Whatever train was open belonged to the other board, so it closes and
+  // its identity leaves the URL; `to=` is a departures filter and goes
+  // with it into the entry Back returns to.
+  const selectBoard = useCallback((mode) => {
+    if (mode === boardMode) return;
+    setOpenId(null);
+    setPendingLink(null);
+    setMissingLink(false);
+    const url = urlWithLink(null);
+    if (mode === ARRIVALS) {
+      url.searchParams.set(BOARD_PARAM, ARRIVALS);
+      url.searchParams.delete(TO_PARAM);
+      setDestination(null);
+    } else {
+      url.searchParams.delete(BOARD_PARAM);
+    }
+    window.history.pushState(null, '', url);
+    setBoardMode(mode);
+  }, [boardMode]);
+
   /* --- live data, refreshed every CONFIG.refreshMs ---------------- */
 
   const refresh = useCallback(async (signal) => {
@@ -972,12 +1080,12 @@ export default function App() {
     try {
       // Always the canonical iRail id — the slug never reaches the API.
       const next = MOCK
-        ? (await mockSource()).getMockLiveboard(stationRef.current)
-        : await getLiveboard(station.id, lang, signal);
+        ? (await mockSource()).getMockLiveboard(stationRef.current, boardMode)
+        : await getLiveboard(station.id, lang, signal, boardMode);
       if (signal?.aborted || sequence !== refreshSequence.current) return;
       // Tagged with the station it was fetched for, so a board that lands
       // for the start-up default is never searched for a linked departure.
-      setBoard({ ...next, stationId: station.id });
+      setBoard({ ...next, stationId: station.id, mode: boardMode });
       setError(null);
       lastGood.current = Date.now();
       setUpdatedAt(lastGood.current);
@@ -990,7 +1098,7 @@ export default function App() {
     } finally {
       if (!signal?.aborted && sequence === refreshSequence.current) setLoading(false);
     }
-  }, [station.id, lang]);
+  }, [station.id, lang, boardMode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1031,8 +1139,9 @@ export default function App() {
     let cancelled = false;
     candidates.forEach(async (d) => {
       const result = MOCK
-        ? mockResult((await mockSource()).getMockStops(d.vehicleId, d.time))
-        : await getStops(d.vehicleId, d.time, lang);
+        ? mockResult((await mockSource()).getMockStops(d.vehicleId, d.time,
+          d.arrival ? 'before' : 'after'))
+        : await getStops(d.vehicleId, d.time, lang, d.arrival ? 'before' : 'after');
       // The station, the language or the board moved on while this was in
       // the queue: the answer is still cached for whoever wants it next,
       // but it must not reach a board it no longer describes.
@@ -1088,6 +1197,8 @@ export default function App() {
   const withJourney = useCallback((d) => {
     const stops = routesById[d.id]?.stops;
     if (!stops?.length) return d;
+    // An arrival's stops lie behind it: nothing there can shorten the run.
+    if (d.arrival) return { ...d, intermediateStops: stops };
     const lastServed = [...stops].reverse().find((s) => !s.cancelled);
     const shortened = Boolean(lastServed) && Boolean(stops.at(-1)?.cancelled);
     return {
@@ -1131,7 +1242,10 @@ export default function App() {
   // the number alone. A departure that is not there is reported, and no
   // other train is opened in its place.
   useEffect(() => {
-    if (!pendingLink || !board || board.stationId !== pendingLink.stationId) return;
+    // Only a board of the right station *and* the right kind may answer:
+    // an arrivals link is never used up by a departures board.
+    if (!pendingLink || !board || board.stationId !== pendingLink.stationId
+        || board.mode !== pendingLink.mode) return;
     setPendingLink(null);
     const match = board.departures.find((d) => sameLink(departureLink(d), pendingLink));
     if (match) {
@@ -1164,6 +1278,8 @@ export default function App() {
     url.searchParams.set(STATION_PARAM, stationToSlug(station));
     if (destination) url.searchParams.set(TO_PARAM, stationToSlug(destination));
     else url.searchParams.delete(TO_PARAM);
+    if (link.mode === ARRIVALS) url.searchParams.set(BOARD_PARAM, ARRIVALS);
+    else url.searchParams.delete(BOARD_PARAM);
     url.searchParams.delete(KIOSK_PARAM);
     return { url: url.href };
   }, [selectedDeparture, station, destination]);
@@ -1402,10 +1518,16 @@ export default function App() {
   // whichever order the document listeners run.
   const overlayOpen = useRef(false);
   overlayOpen.current = picking || Boolean(info) || Boolean(selectedDeparture);
+  // The title-bar board menu stays usable in kiosk. Header reports its
+  // open state straight into this ref, so an Escape that closes the menu
+  // is seen as taken here too, whichever listener runs first.
+  const boardMenuOpen = useRef(false);
+  const onBoardMenu = useCallback((open) => { boardMenuOpen.current = open; }, []);
   useEffect(() => {
     if (!kiosk) return undefined;
     const onKey = (e) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || overlayOpen.current) return;
+      if (e.key !== 'Escape' || e.defaultPrevented
+          || overlayOpen.current || boardMenuOpen.current) return;
       e.preventDefault();
       exitKiosk();
     };
@@ -1506,6 +1628,11 @@ export default function App() {
         fullscreenLabel={t.fullscreen}
         fullscreenExitLabel={t.fullscreenExit}
         kiosk={kiosk}
+        boardMode={boardMode}
+        boardLabels={{ [DEPARTURES]: t.boardDepartures, [ARRIVALS]: t.boardArrivals }}
+        boardPickLabel={t.boardPick}
+        onBoard={selectBoard}
+        onBoardMenu={onBoardMenu}
         kioskLabel={t.kiosk}
         onKiosk={enterKiosk}
         menuLabel={t.menu}

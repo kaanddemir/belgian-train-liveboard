@@ -604,7 +604,7 @@ thing on the board. Everything else is live iRail.
   `stationId` / `stationName` / `stationSlug` state.
 - History is native `history.pushState` plus a `popstate` listener. Do
   not add a router unless the app genuinely grows real routes.
-- Update only the `station`, `to`, `train` and `dep` parameters via `URL` /
+- Update only the `station`, `to`, `board`, `train`, `dep` and `arr` parameters via `URL` /
   `URLSearchParams`; leave every other query parameter untouched.
 - `to=` is the direct-train filter's destination, and it is a slug on the
   same terms as `station=`: derived with `stationToSlug()`, resolved with
@@ -660,6 +660,31 @@ thing on the board. Everything else is live iRail.
 - Results are progressive: each journey is committed as it lands, in
   liveboard order. A definitive "no direct departures" requires *every*
   candidate to have a definitive result.
+
+## Arrivals board rules
+
+- One board, two modes. Arrivals reuse `getLiveboard()` (with
+  `arrdep=arrival`, read from `arrivals.arrival`), the same normalised row
+  shape (`destination` is the origin, `time` the scheduled arrival,
+  `arrival: true`, `left` from `arrived`), the same components, the same
+  scheduler and the same 30 s polling. Never build a parallel board.
+- No `board` parameter means Departures; only exact `board=arrivals`
+  selects Arrivals. Never write `board=departures`: any other value is
+  removed with `replaceState`. The mode state mirrors the URL, like kiosk.
+- Switching boards pushes a history entry, closes Train Details and drops
+  its identity. `to=` is Departures-only: entering Arrivals removes it in
+  the same entry, and the From -> To flow always returns to Departures.
+- An arrival's "via" is the stops *before* this station, sliced from the
+  same cached `/vehicle` journey (`getStops(…, 'before')`). No request is
+  added for the origin — it comes from the liveboard itself.
+- Departure links are `train` + `dep`; arrival links are `board=arrivals`
+  + `train` + `arr` (scheduled arrival). Never put an arrival time in
+  `dep`. A pending link resolves only against a board of the same station
+  and the same mode.
+- Canonical Share URLs carry `board=arrivals` + `arr` for arrivals and
+  never `kiosk`.
+- The title-bar board menu stays usable in kiosk. It reports its open
+  state to `App.jsx` so Escape closes the menu before it can leave kiosk.
 
 ## Kiosk mode rules
 
