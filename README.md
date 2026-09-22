@@ -11,7 +11,7 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
 - Search across Belgian stations using live iRail station data
 - Direct From → To filtering based on each train's actual onward stops
 - Train Details with a full route timeline, stop times, platforms, delays, and reported occupancy
-- Historical Performance for the opened train at the station on screen: typical delay, on-time rate, and a 9-in-10 delay bound over the last 30 service days
+- Historical Performance for the opened train at the station on screen: Typical Delay, On-Time Rate, and 90% Arrive Within, over the most recent window the collected data covers
 - Optional interactive route map with pan, pinch, and zoom controls
 - Dutch, French, English, and German interfaces
 - Responsive desktop, tablet, and phone layouts
@@ -24,9 +24,9 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
 
 ### Desktop
 
-<img src="docs/screenshots/train-details-timeline-desktop.png" alt="Train Details panel with a route timeline and occupancy information" width="100%">
+<img src="docs/screenshots/train-details-timeline-desktop.png" alt="Train Details panel with a route timeline, occupancy, and the Historical Performance section" width="100%">
 
-*Train Details and route timeline*
+*Train Details, route timeline and Historical Performance*
 
 <img src="docs/screenshots/train-details-map-desktop.jpg" alt="Train Details interactive map showing a multi-stop railway route" width="100%">
 
@@ -41,8 +41,8 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
       <sub><em>Liveboard</em></sub>
     </td>
     <td align="center" width="33%">
-      <img src="docs/screenshots/train-details-timeline-mobile.png" alt="Train Details route timeline on mobile" width="260"><br>
-      <sub><em>Train Details and route timeline</em></sub>
+      <img src="docs/screenshots/train-details-timeline-mobile.png" alt="Train Details route timeline and Historical Performance on mobile" width="260"><br>
+      <sub><em>Train Details and Historical Performance</em></sub>
     </td>
     <td align="center" width="33%">
       <img src="docs/screenshots/train-details-map-mobile.jpg" alt="Train Details interactive map on mobile" width="260"><br>
@@ -51,7 +51,7 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
   </tr>
 </table>
 
-Screenshots show live data from Bruxelles-Central; displayed services vary with the current liveboard.
+Screenshots show Bruxelles-Central; displayed services vary with the current liveboard. The two Train Details images are captured from the development fixture board (`?mock=1`), so the Historical Performance section is visible without a published aggregate.
 
 ## Data Sources
 
@@ -116,19 +116,69 @@ Performance is **historical, not predictive**. It answers one question — how t
 
 Its identity is `(departure.trainNumber, normalized current board station)`: the iRail train number is the same integer as Infrabel's `TRAIN_NO`, and the station is normalized through `stationPerformanceKey()` in `src/data/rail/normalizeStationName.js`, the same contract the route map's station matching uses. An Infrabel stopping point that is not a known iRail passenger station — a junction, siding, depot or freight point — never enters the data.
 
-The window **adapts to how much recent history has been collected**. The build picks the largest trailing window the dataset genuinely covers — 30 days (at least 27 covered), else 15 (14), else 10 (all 10) — measured over the real calendar days ending at the newest service day, never over whichever days happen to be present. Ten August days plus one September day is not "the last 10 days".
+The figures are calculated by this project from [Infrabel Open Data](https://opendata.infrabel.be/) historical arrival delays (`DELAY_ARR`). They are not official Infrabel or SNCB/NMBS statistics, they are not a prediction about today's train, and they describe this train **at this station only** — not the performance of its whole route.
+
+#### Metrics
+
+Three metrics are published, computed **only from the selected window's days**, all from the same sample of signed arrival delays in seconds (early arrivals keep their negative sign and are never clamped).
+
+##### Typical Delay
+
+Median historical arrival delay for this train at the current station.
+
+```text
++3 min
+```
+
+Minimum sample: `n >= 10`.
+
+##### On-Time Rate
+
+Share of comparable arrivals delayed by less than 6 minutes — `DELAY_ARR < 360` seconds.
+
+```text
+81%
+```
+
+Minimum sample: `n >= 10`.
+
+##### 90% Arrive Within
+
+90th percentile of the arrival delay, rounded up. `+11 min` means 90% of comparable arrivals were no more than 11 minutes late.
+
+```text
++11 min
+```
+
+Minimum sample: `n >= 20`.
+
+#### Reading the meta line
+
+```text
+Last 30 days · 26 comparable journeys
+```
+
+- the selected recent window is 30 calendar days;
+- 26 valid observations for this train at this station were used.
+
+A calendar day in the window does not necessarily produce an observation: a train that did not run that day simply contributes none, which is why the sample count is always shown beside the window.
+
+#### Adaptive window
+
+The build picks the largest trailing window the dataset genuinely covers:
+
+| Coverage | Window shown |
+| --- | --- |
+| trailing 30 calendar days, at least 27 covered | `Last 30 days` |
+| otherwise trailing 15 calendar days, at least 14 covered | `Last 15 days` |
+| otherwise all 10 trailing calendar days covered | `Last 10 days` |
+| otherwise | `Collecting history` |
+
+Windows are measured over real trailing calendar dates ending at the newest service day, so scattered older dates are never labelled "Last 10 days". Daily ingestion moves that coverage forward on its own, and a monthly backfill repairs days that were missed.
 
 Ten days is the shortest window offered, and it requires all ten days: a train calls at a station about once a day, so a shorter window — or a ten-day window with a gap — could not reach the ten observations a median or a percentage needs, and would have shown a real-looking label above no figures.
 
-Three metrics are published, computed **only from the selected window's days**, all of them the same sample of signed arrival delays (`DELAY_ARR`, in seconds; early arrivals keep their sign and are never clamped):
-
-| Metric | Definition | Minimum sample |
-| --- | --- | --- |
-| Typical Delay | median arrival delay | `n >= 10` |
-| On-Time Rate | share of arrivals delayed by **less than 6 minutes** (`< 360 s`) | `n >= 10` |
-| 90% Arrive Within | 90th percentile of arrival delay, rounded up | `n >= 20` |
-
-Below ten observations the panel names the sample and says the data is insufficient rather than printing a figure; between ten and twenty the 9-in-10 row simply does not render. One sample count covers all three metrics, and it is always shown.
+Below ten observations the panel names the sample and says the data is insufficient rather than printing a figure; between ten and twenty the `90% Arrive Within` row simply does not render. One sample count covers all three metrics, and it is always shown.
 
 Note that the thresholds count observations inside the *selected* window, and reaching ten needs ten covered days — which is why the shortest window demands all of them.
 

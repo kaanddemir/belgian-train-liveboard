@@ -2667,18 +2667,18 @@ body.modal-open{ overflow:hidden; }
   /* the same edge every other railway surface uses on a phone */
   .train-performance{ padding:var(--space-4) var(--phone-edge) var(--space-5); }
   /* Three columns at this width would be three cramped ones, so the
-     figures stack instead and keep their grouping down the page.
-     Stacked, they go back to the left edge: there is no column to be
-     centred in any more, and a centred block under a left-aligned
-     heading and metadata line would read as a misalignment rather than
-     as a centring. */
+     figures stack instead and keep their grouping down the page. Each
+     one stays centred, exactly as it is inside its own third on a wider
+     screen: the label, the number and the gloss keep reading as one
+     block rather than as three lines that share a left edge. The
+     vertical gap does the separating the column tracks used to do. */
   .train-performance__list{
     grid-template-columns:1fr;
     gap:var(--space-3);
   }
   .train-performance__metric{
-    align-items:flex-start;
-    text-align:left;
+    align-items:center;
+    text-align:center;
   }
   /* the About panel folds the same way the details panel does */
   .about-overlay{ padding:0; align-items:stretch; overflow-y:auto; }
