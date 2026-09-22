@@ -24,6 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
       # The historical Performance shards are operational output, not
       # source: they are regenerated every day and live on the orphan

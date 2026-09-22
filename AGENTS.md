@@ -150,8 +150,8 @@ scripts/data/build-rail-network.mjs
 ## Component rules
 
 - Create a component when it represents a meaningful piece of UI or
-  behaviour, not to shorten a file. The four existing components are the
-  right granularity.
+  behaviour, not to shorten a file. The existing components in
+  `src/components/` are the right granularity.
 - Avoid over-componentisation: small local helpers (`Badge`, `Platform`,
   `MainLine`, `SecondLine` in `DepartureRow.jsx`) stay in the file that
   uses them.

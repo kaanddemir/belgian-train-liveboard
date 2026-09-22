@@ -64,6 +64,9 @@ export default function StationModal({
   // returns focus to it and not to whichever one is written first.
   const leftBy = useRef(routeLinkRef);
   const exitTimer = useRef(0);
+  // The location lookup in flight, by number. Closing the picker or
+  // starting another lookup moves it on, so a late answer is dropped.
+  const locateRequest = useRef(0);
   // Whether the user has touched the From field during this opening. The
   // default origin is seeded from the board's station, which is only
   // fully resolved once /stations lands — without this the list arriving
@@ -98,10 +101,14 @@ export default function StationModal({
     setToQuery(destination?.name || '');
     setField('to');
     setAtLimit(false);
+    setLocating(null);
     leftBy.current = routeLinkRef;
     fromTouched.current = false;
     const id = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(id);
+    return () => {
+      cancelAnimationFrame(id);
+      locateRequest.current += 1;
+    };
     // `destination` is read as the opening value only: changing the live
     // filter must not reset a form the user is already filling in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,12 +213,17 @@ export default function StationModal({
     if (!loaded || locating === 'busy') return;
     if (!navigator.geolocation) { setLocating('failed'); return; }
     setLocating('busy');
+    const request = locateRequest.current += 1;
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        if (request !== locateRequest.current) return;
         const station = nearestStation(stations.list, coords.latitude, coords.longitude);
         if (station) { setLocating(null); choose(station); } else setLocating('failed');
       },
-      (err) => setLocating(err.code === err.PERMISSION_DENIED ? 'denied' : 'failed'),
+      (err) => {
+        if (request !== locateRequest.current) return;
+        setLocating(err.code === err.PERMISSION_DENIED ? 'denied' : 'failed');
+      },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
     );
   };

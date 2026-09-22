@@ -1,29 +1,56 @@
 # Belgian Train Liveboard
 
 An independent, non-commercial web application that shows live Belgian train
-departures in an interface styled after the departure boards installed in
-Belgian railway stations.
+departures and arrivals in an interface styled after the information boards
+installed in Belgian railway stations.
 
 It is not an official SNCB/NMBS product, and it is not affiliated with,
-endorsed by, or operated by SNCB/NMBS. The SNCB/NMBS names and trademarks
-remain the property of their respective owners.
+endorsed by, or operated by SNCB/NMBS, Infrabel or iRail. The SNCB/NMBS names
+and trademarks remain the property of their respective owners.
 
 Live railway information is provided through the iRail API.
 
 ## Capabilities
 
-- Live departure board for any Belgian station: times, destinations, delays,
+- Live Departures board for any Belgian station: times, destinations, delays,
   platforms, platform changes, cancellations and service alerts.
+- Live Arrivals on the same board, switched from the board title: origins,
+  scheduled arrival times, delays and platforms.
 - Station search over real iRail station data, in all four languages.
+- Up to five favourite stations; the last chosen station is remembered.
+- Nearest station from the browser's location, only when the location button
+  is pressed. The position is not stored or sent anywhere.
 - Direct From -> To filtering: shows only departures whose own route calls at
   the chosen destination, without a change of train.
 - Train Details: the full route of a train as a timeline, with per-stop times,
   platforms, delays and occupancy where the operator reports it.
 - Optional route map drawn from preprocessed Infrabel open railway data, on
-  OpenStreetMap base tiles. The drawn route is approximate.
+  OpenStreetMap base tiles, when the route can be matched. The drawn route is
+  approximate.
+- Historical Performance for the opened train at the station on screen:
+  typical delay, on-time rate and 90th-percentile delay over a recent 10, 15
+  or 30-day window, shown only with enough comparable journeys.
+- Kiosk mode for unattended displays.
 - Multilingual interface: FR / NL / EN / DE.
-- Shareable station URLs, for example ?station=bruxelles-central and
-  ?station=bruxelles-central&to=leuven.
+- Shareable links for stations, boards and individual trains.
+
+## URLs
+
+- Departures (default, no board parameter): ?station=bruxelles-central
+- Arrivals: ?station=bruxelles-central&board=arrivals
+- Direct-train filter: ?station=bruxelles-central&to=leuven
+- Kiosk mode: add &kiosk=1
+- A departing train: ?station=bruxelles-central&train=<number>&dep=<scheduled
+  departure, Unix seconds>
+- An arriving train: ?station=bruxelles-central&board=arrivals&train=<number>
+  &arr=<scheduled arrival, Unix seconds>
+
+## Historical Performance
+
+The figures are calculated by this project from Infrabel Open Data historical
+arrival delays. They describe past runs of this train at this station only.
+They are not predictions about any journey, and they are not official
+SNCB/NMBS, Infrabel or iRail statistics.
 
 ## Accuracy
 
@@ -35,4 +62,5 @@ operator.
 ## Links
 
 - iRail API documentation: https://docs.irail.be/
+- Infrabel Open Data: https://opendata.infrabel.be/
 - SNCB/NMBS (official travel information): https://www.belgiantrain.be/
