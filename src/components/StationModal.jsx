@@ -242,6 +242,15 @@ export default function StationModal({
     setActive(0);
   };
 
+  // Swaps the two fields as they stand — picked stations and typed text
+  // alike — so the return journey is one press away.
+  const swapRoute = () => {
+    fromTouched.current = true;
+    setFrom(to); setTo(from);
+    setFromQuery(toQuery); setToQuery(fromQuery);
+    setActive(0);
+  };
+
   const routeReady = Boolean(from && to && from.id !== to.id);
   const applyRoute = () => {
     if (!routeReady) return;
@@ -479,14 +488,29 @@ export default function StationModal({
 
             {status && <p className="station-status" role="status" aria-live="polite">{status}</p>}
 
-            <button
-              type="button"
-              className="station-apply"
-              disabled={!routeReady}
-              onClick={applyRoute}
-            >
-              {t.showDepartures}
-            </button>
+            <div className="station-route__actions">
+              <button
+                type="button"
+                className="station-apply"
+                disabled={!routeReady}
+                onClick={applyRoute}
+              >
+                {t.showDepartures}
+              </button>
+              <button
+                type="button"
+                className="station-swap"
+                onClick={swapRoute}
+                disabled={!fromQuery && !toQuery}
+                aria-label={t.swapRoute}
+                title={t.swapRoute}
+              >
+                <svg className="station-back__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="7 4 7 20" /><polyline points="3 8 7 4 11 8" />
+                  <polyline points="17 20 17 4" /><polyline points="13 16 17 20 21 16" />
+                </svg>
+              </button>
+            </div>
             <p className="station-route__note">{t.directOnly}</p>
           </div>
         )}

@@ -661,6 +661,20 @@ thing on the board. Everything else is live iRail.
   liveboard order. A definitive "no direct departures" requires *every*
   candidate to have a definitive result.
 
+## Kiosk mode rules
+
+- Kiosk is URL-driven: active only when `kiosk=1`, read from the URL on
+  start-up and on `popstate`. The `kiosk` state in `App.jsx` only mirrors
+  the URL; never let it change without the URL changing too.
+- Normal navigation edits `new URL(window.location.href)`, so `kiosk`
+  survives station, `to=` and Train Details changes. Keep it that way.
+- The canonical Share URL removes `kiosk`: it is a display preference,
+  not part of a departure's identity.
+- Kiosk never calls the Fullscreen API; the two stay separate actions.
+- Escape exits kiosk only when no overlay is open. The cursor timer, its
+  listeners, the `kiosk-idle` class and any Wake Lock sentinel are all
+  released when kiosk ends or the app unmounts.
+
 ## Visual design rules
 
 This application should look like a **railway information display**, not

@@ -53,6 +53,12 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
 
 Screenshots show Bruxelles-Central; displayed services vary with the current liveboard. The two Train Details images are captured from the development fixture board (`?mock=1`), so the Historical Performance section is visible without a published aggregate.
 
+### Kiosk mode
+
+Choose **Kiosk mode** from the three-dot menu or add `?kiosk=1` to the URL. Search and the menu are hidden, the mouse cursor hides after a few idle seconds, and supported browsers keep the screen awake. Press Escape to leave kiosk mode.
+
+Kiosk mode does not enter browser fullscreen; Full screen stays a separate menu action.
+
 ## Data Sources
 
 - [iRail](https://docs.irail.be/) provides the station list, liveboard departures, delays, platforms, alerts, and train route information. The browser calls its public API directly; no private SNCB/NMBS API is used.

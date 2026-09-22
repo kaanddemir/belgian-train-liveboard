@@ -46,6 +46,16 @@ const TRAIN_PATTERN = /^[A-Za-z0-9]{1,12}$/;
 // 2001-09-09 .. 2100-01-01: anything outside is not a departure time.
 const DEP_MIN = 1_000_000_000;
 const DEP_MAX = 4_102_444_800;
+// Kiosk mode: a local display preference, not part of what the board
+// shows. Only the exact value `1` turns it on. The URL is its only
+// source of truth — state merely mirrors it after each navigation — and
+// the canonical Share link leaves it out.
+const KIOSK_PARAM = 'kiosk';
+const kioskFromUrl = () =>
+  new URLSearchParams(window.location.search).get(KIOSK_PARAM) === '1';
+// How long a still mouse waits before the cursor is hidden in kiosk mode.
+const KIOSK_IDLE_MS = 3000;
+
 // How long the "no longer on the board" line stays before it clears itself.
 const MISSING_LINK_MS = 10_000;
 
@@ -193,6 +203,7 @@ const TEXT = {
     ],
     fullscreen: 'Volledig scherm',
     fullscreenExit: 'Volledig scherm verlaten',
+    kiosk: 'Kioskmodus',
     unknownStation: (s) => `Onbekend station “${s}”`,
     details: 'Treindetails',
     close: 'Sluiten',
@@ -224,6 +235,7 @@ const TEXT = {
     fromLabel: 'Van',
     toLabel: 'Naar',
     showDepartures: 'Vertrekken tonen',
+    swapRoute: 'Vertrek en bestemming omwisselen',
     directOnly: 'Alleen rechtstreekse treinen, zonder overstap.',
     findingDirect: 'Rechtstreekse treinen zoeken…',
     noDirect: (s) => `Geen rechtstreekse trein naar ${s}.`,
@@ -298,6 +310,7 @@ const TEXT = {
     ],
     fullscreen: 'Plein écran',
     fullscreenExit: 'Quitter le plein écran',
+    kiosk: 'Mode kiosque',
     unknownStation: (s) => `Gare inconnue « ${s} »`,
     details: 'Détails du train',
     close: 'Fermer',
@@ -329,6 +342,7 @@ const TEXT = {
     fromLabel: 'De',
     toLabel: 'Vers',
     showDepartures: 'Afficher les départs',
+    swapRoute: 'Inverser départ et destination',
     directOnly: 'Trains directs uniquement, sans correspondance.',
     findingDirect: 'Recherche des trains directs…',
     noDirect: (s) => `Aucun train direct vers ${s}.`,
@@ -403,6 +417,7 @@ const TEXT = {
     ],
     fullscreen: 'Full screen',
     fullscreenExit: 'Exit full screen',
+    kiosk: 'Kiosk mode',
     unknownStation: (s) => `Unknown station “${s}”`,
     details: 'Train details',
     close: 'Close',
@@ -434,6 +449,7 @@ const TEXT = {
     fromLabel: 'From',
     toLabel: 'To',
     showDepartures: 'Show departures',
+    swapRoute: 'Swap origin and destination',
     directOnly: 'Direct trains only, no transfers.',
     findingDirect: 'Finding direct departures…',
     noDirect: (s) => `No direct departures found to ${s}.`,
@@ -508,6 +524,7 @@ const TEXT = {
     ],
     fullscreen: 'Vollbild',
     fullscreenExit: 'Vollbild beenden',
+    kiosk: 'Kioskmodus',
     unknownStation: (s) => `Unbekannter Bahnhof „${s}“`,
     details: 'Zugdetails',
     close: 'Schließen',
@@ -539,6 +556,7 @@ const TEXT = {
     fromLabel: 'Von',
     toLabel: 'Nach',
     showDepartures: 'Abfahrten anzeigen',
+    swapRoute: 'Start und Ziel tauschen',
     directOnly: 'Nur Direktzüge, ohne Umstieg.',
     findingDirect: 'Direktverbindungen werden gesucht…',
     noDirect: (s) => `Kein Direktzug nach ${s}.`,
@@ -746,6 +764,7 @@ export default function App() {
   const [picking, setPicking] = useState(false);
   // which informational panel is open, if any: 'about' | 'legal'
   const [info, setInfo] = useState(null);
+  const [kiosk, setKiosk] = useState(kioskFromUrl);
   // Only the id of the opened departure: the departure itself is derived
   // from the live list below, so it keeps refreshing while the overlay is
   // open instead of freezing a copy.
@@ -868,7 +887,7 @@ export default function App() {
 
   // Back / forward: re-resolve, swap the board, no page reload.
   useEffect(() => {
-    const onPop = () => applyUrl(stationsRef.current, true);
+    const onPop = () => { setKiosk(kioskFromUrl()); applyUrl(stationsRef.current, true); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [applyUrl]);
@@ -1145,6 +1164,7 @@ export default function App() {
     url.searchParams.set(STATION_PARAM, stationToSlug(station));
     if (destination) url.searchParams.set(TO_PARAM, stationToSlug(destination));
     else url.searchParams.delete(TO_PARAM);
+    url.searchParams.delete(KIOSK_PARAM);
     return { url: url.href };
   }, [selectedDeparture, station, destination]);
 
@@ -1360,6 +1380,91 @@ export default function App() {
     if (window.history.state?.trainDetails) window.history.back();
     else clearLinkFromUrl();
   }, []);
+  // Kiosk is entered from the menu with a new history entry, like any
+  // other navigation, and left with Escape by rewriting the current one.
+  // Either way only the `kiosk` parameter changes.
+  const enterKiosk = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set(KIOSK_PARAM, '1');
+    window.history.pushState(window.history.state, '', url);
+    setKiosk(true);
+  }, []);
+  const exitKiosk = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(KIOSK_PARAM);
+    window.history.replaceState(window.history.state, '', url);
+    setKiosk(false);
+  }, []);
+
+  // Escape leaves kiosk only when nothing above the board would take it.
+  // The overlays close on their own Escape; reading their state from a
+  // ref means a key that just closed one is still seen as "taken", in
+  // whichever order the document listeners run.
+  const overlayOpen = useRef(false);
+  overlayOpen.current = picking || Boolean(info) || Boolean(selectedDeparture);
+  useEffect(() => {
+    if (!kiosk) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || overlayOpen.current) return;
+      e.preventDefault();
+      exitKiosk();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [kiosk, exitKiosk]);
+
+  // The cursor goes after a few still seconds and comes back on the next
+  // mouse movement. Touch and pen never hide it: they have no cursor.
+  useEffect(() => {
+    if (!kiosk) return undefined;
+    const body = document.body;
+    let timer = 0;
+    const wake = (e) => {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      body.classList.remove('kiosk-idle');
+      clearTimeout(timer);
+      timer = setTimeout(() => body.classList.add('kiosk-idle'), KIOSK_IDLE_MS);
+    };
+    wake({});
+    window.addEventListener('pointermove', wake, { passive: true });
+    window.addEventListener('pointerdown', wake, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointermove', wake);
+      window.removeEventListener('pointerdown', wake);
+      body.classList.remove('kiosk-idle');
+    };
+  }, [kiosk]);
+
+  // Keep the screen awake where the browser allows it. The browser drops
+  // the lock whenever the tab is hidden, so it is asked for again on the
+  // way back — once, never while a request or a live lock is in hand.
+  useEffect(() => {
+    if (!kiosk || !navigator.wakeLock?.request) return undefined;
+    let sentinel = null;
+    let pending = false;
+    let done = false;
+    const acquire = () => {
+      if (done || pending || document.visibilityState !== 'visible') return;
+      if (sentinel && !sentinel.released) return;
+      pending = true;
+      navigator.wakeLock.request('screen')
+        .then((lock) => {
+          if (done) lock.release().catch(() => {});
+          else sentinel = lock;
+        })
+        .catch(() => {})
+        .finally(() => { pending = false; });
+    };
+    acquire();
+    document.addEventListener('visibilitychange', acquire);
+    return () => {
+      done = true;
+      document.removeEventListener('visibilitychange', acquire);
+      sentinel?.release().catch(() => {});
+    };
+  }, [kiosk]);
+
   const openAbout = useCallback(() => setInfo('about'), []);
   const openLegal = useCallback(() => setInfo('legal'), []);
   const closeInfo = useCallback(() => setInfo(null), []);
@@ -1400,6 +1505,9 @@ export default function App() {
         languageLabel={t.language}
         fullscreenLabel={t.fullscreen}
         fullscreenExitLabel={t.fullscreenExit}
+        kiosk={kiosk}
+        kioskLabel={t.kiosk}
+        onKiosk={enterKiosk}
         menuLabel={t.menu}
         aboutLabel={t.about}
         legalLabel={t.legal}

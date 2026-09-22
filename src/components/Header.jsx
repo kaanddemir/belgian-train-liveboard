@@ -48,6 +48,7 @@ export default function Header({
   station, title, onPickStation, pickLabel,
   languages = [], lang, onLanguage, languageLabel,
   fullscreenLabel, fullscreenExitLabel,
+  kiosk = false, kioskLabel, onKiosk,
   menuLabel, aboutLabel, onAbout, legalLabel, onLegal,
   stationLabel, updatedLabel, updatedAt,
 }) {
@@ -143,7 +144,9 @@ export default function Header({
         )}
         {/* Search stays in the bar: it is the one control the board is
             actually operated with. Everything else moved into the menu
-            beside it, so the title bar reads as a screen, not a toolbar. */}
+            beside it, so the title bar reads as a screen, not a toolbar.
+            Kiosk mode drops both: the screen is only for reading. */}
+        {!kiosk && (<>
         <button
           type="button"
           className="topbar-pick"
@@ -240,6 +243,21 @@ export default function Header({
                 type="button"
                 role="menuitem"
                 className="topbar-menu-item topbar-menu-item--row"
+                onClick={() => { closeMenu({ restoreFocus: false }); onKiosk?.(); }}
+              >
+                {/* a display on its stand */}
+                <svg className="topbar-menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3.5" y="4.5" width="17" height="11" rx="1" />
+                  <line x1="12" y1="15.5" x2="12" y2="19.5" />
+                  <line x1="8" y1="19.5" x2="16" y2="19.5" />
+                </svg>
+                {kioskLabel}
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                className="topbar-menu-item topbar-menu-item--row"
                 onClick={() => { closeMenu({ restoreFocus: false }); onAbout?.(); }}
               >
                 <svg className="topbar-menu-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -286,6 +304,7 @@ export default function Header({
             </div>
           )}
         </div>
+        </>)}
       </div>
     </header>
   );

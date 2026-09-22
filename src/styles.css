@@ -564,6 +564,11 @@ body{
   stroke-linejoin:round;
 }
 
+/* Kiosk mode: after a few still seconds the mouse cursor goes, over
+   every control too. Only the class ever set it; leaving kiosk removes it. */
+body.kiosk-idle,
+body.kiosk-idle *{ cursor:none !important; }
+
 /* =========================
    Departure Board
    ========================= */
@@ -1305,7 +1310,6 @@ body{
    step apart, and the action takes the larger step before the note. */
 .station-face--route{ gap:var(--space-2); }
 .station-route__row{ display:flex; flex-direction:column; gap:var(--space-1); min-height:0; }
-.station-face--route .station-apply{ margin-top:var(--space-3); }
 .station-route__label{
   padding:0 var(--station-field-inset);
   color:var(--color-picker-status-text);
@@ -1319,8 +1323,44 @@ body{
 .station-field--row.is-set{ border-color:var(--color-surface-focus-border); }
 .station-field--row.is-set .station-input{ font-weight:var(--font-weight-bold); }
 
+/* Apply and swap share one row exactly as wide as the fields: the swap
+   takes its width out of the apply button, never out of the margin.
+   Both stretch to the row's height, and the swap's inline padding
+   matches the apply's block padding so it lands roughly square. */
+.station-route__actions{
+  --station-action-pad:clamp(12px, 1.7vh, 18px);
+  display:flex;
+  gap:var(--space-2);
+  margin-top:var(--space-3);
+}
+.station-route__actions .station-apply{ flex:1 1 auto; min-width:0; }
+.station-swap{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:44px;
+  padding:0 var(--station-action-pad);
+  border:0;
+  border-radius:var(--radius-pill);
+  background:var(--color-topbar);
+  color:var(--color-board-text);
+  font-size:var(--font-size-suggestion);
+  cursor:pointer;
+  box-shadow:var(--shadow-panel);
+  transition:opacity var(--transition-fast), background-color var(--transition-fast);
+}
+/* the same blue and the same states as the apply button beside it */
+.station-swap:hover:enabled{ background:var(--color-surface-focus-border); opacity:.92; }
+.station-swap:active:enabled{ opacity:.85; }
+.station-swap:focus-visible{
+  outline:2px solid var(--color-board-text);
+  outline-offset:2px;
+}
+.station-swap:disabled{ opacity:.45; cursor:default; }
+
 .station-apply{
-  padding:clamp(12px, 1.7vh, 18px) var(--space-5);
+  padding:var(--station-action-pad, clamp(12px, 1.7vh, 18px)) var(--space-5);
   border:0;
   border-radius:var(--radius-pill);
   background:var(--color-topbar);
@@ -2983,6 +3023,7 @@ body.modal-open{ overflow:hidden; }
   .station-action,
   .station-back,
   .station-apply,
+  .station-swap,
   .notice__clear,
   .topbar-pick,
   .topbar-menu-item,
