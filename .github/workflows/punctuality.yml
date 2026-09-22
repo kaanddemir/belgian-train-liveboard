@@ -1,0 +1,132 @@
+name: Ingest Infrabel punctuality
+
+# The Performance section's whole background half. Nothing a reader does
+# ever reaches Infrabel: this workflow is the only thing that talks to
+# it, on a schedule, and the browser only ever fetches the static files
+# it publishes.
+#
+# Infrabel overwrites its D-1 dataset every morning, so a day this job
+# fails to collect is a day lost until the monthly file appears about a
+# month later. Hence three attempts a day rather than one — the run is
+# nearly free once the day is already in state, because it exits before
+# downloading anything.
+
+on:
+  schedule:
+    # Infrabel publishes D-1 around 04:00-05:00 UTC. The first run takes
+    # it; the other two only do anything if the first could not.
+    - cron: '0 6 * * *'
+    - cron: '0 10 * * *'
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: 'Seed or repair the window from a monthly file (YYYYMM)'
+        required: false
+        type: string
+
+# The job reads main for the code and force-replaces the orphan `data`
+# branch. It needs nothing else: no Pages rights of its own, no id-token,
+# and no personal access token — the built-in GITHUB_TOKEN can push
+# within this repository, and the deploy it asks for at the end runs
+# under its own workflow's permissions.
+permissions:
+  contents: write
+  actions: write
+
+# Two runs must never race for the same branch: the loser would force
+# away the winner's state. Queue rather than cancel, so a run that has
+# already ingested a day is allowed to finish publishing it.
+concurrency:
+  group: punctuality
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The rolling state and the generated shards, as they stand now.
+      # A missing branch is the normal first run, not an error: the
+      # directory is simply created empty and the backfill fills it.
+      # Cloned into its own directory rather than checked out over the
+      # working tree: the two branches share no history and must not
+      # share an index either.
+      - name: Fetch the current data branch
+        run: |
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git clone --depth 1 --branch data \
+              "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" \
+              .punctuality
+            echo "state restored: $(ls .punctuality/state/*.json.gz 2>/dev/null | wc -l) service day(s)"
+          else
+            mkdir -p .punctuality
+            echo "no data branch yet — starting from empty state"
+          fi
+
+      # Every write below happens here, on the runner. Nothing is pushed
+      # until all of it has succeeded, so a bad download, a failed
+      # validation or an implausible aggregate leaves the published
+      # files exactly as they were.
+      - name: Ingest and aggregate
+        id: build
+        run: |
+          if [ -n "${{ inputs.backfill }}" ]; then
+            node scripts/data/build-punctuality.mjs --backfill "${{ inputs.backfill }}" --state .punctuality
+            echo "ingested=true" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/data/build-punctuality.mjs --daily --state .punctuality
+          fi
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo '## Infrabel punctuality'
+            echo
+            if [ -f .punctuality/state/manifest.json ]; then
+              echo '```json'
+              cat .punctuality/state/manifest.json
+              echo '```'
+              echo
+              echo "state files: $(ls .punctuality/state/*.json.gz 2>/dev/null | wc -l)"
+              echo "shards: $(ls .punctuality/generated/performance/*.json 2>/dev/null | wc -l)"
+              echo "published size: $(du -sh .punctuality/generated/performance 2>/dev/null | cut -f1)"
+            else
+              echo 'No state produced — the published files were left untouched.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # One commit, always. The branch is force-replaced rather than
+      # added to, so the rolling state never accumulates history and the
+      # repository stays the size of one window rather than the size of
+      # every window it has ever held.
+      - name: Replace the data branch
+        if: success() && steps.build.outputs.ingested != 'false'
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          cd .punctuality
+          rm -rf .git
+          git init --quiet --initial-branch=data
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit --quiet -m "Rolling 30-day punctuality state through $(date -u +%Y-%m-%d)"
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push --force --quiet origin data
+
+      # A push made with GITHUB_TOKEN deliberately does not trigger other
+      # workflows, so the site would keep serving the previous shards
+      # until the next code change. Ask for the deploy explicitly.
+      - name: Publish the new shards
+        if: success() && steps.build.outputs.ingested != 'false'
+        run: gh workflow run deploy.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

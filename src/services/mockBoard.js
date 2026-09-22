@@ -32,6 +32,9 @@ const TRAINS = [
   {
     train: 'IC', number: '1832', destination: 'Bruxelles-Midi', minutes: -3,
     delay: 10, platform: '4',
+    // two figures and no p90: fourteen journeys is enough for a median
+    // and a percentage, not for a tail
+    performance: { windowDays: 15, samples: 14, medianSec: 170, onTimePct: 86, p90Sec: 640 },
     before: [['Anvers-Central', -25], ['Malines', -14], ['Bruxelles-Nord', -6]],
     after: [['Bruxelles-Midi', 4]],
   },
@@ -59,6 +62,9 @@ const TRAINS = [
   {
     train: 'S10', number: '4287', destination: 'Jette', minutes: 7,
     occupancy: 'low',
+    // the full section: all three figures, beside an occupancy reading,
+    // which is the footer's own layout case
+    performance: { windowDays: 30, samples: 26, medianSec: 180, onTimePct: 81, p90Sec: 660 },
     delay: 1, platform: '2',
     before: [['Alost', -30], ['Bruxelles-Midi', -8]],
     after: [['Bruxelles-Nord', 11], ['Jette', 18]],
@@ -67,6 +73,8 @@ const TRAINS = [
     // no platform published yet: the cell renders the em dash
     train: 'S8', number: '3311', destination: 'Bruxelles-Luxembourg', minutes: 8,
     occupancy: 'medium',
+    // a dataset too young to name a window at all
+    performance: { collectingDays: 6 },
     platform: null,
     before: [['Braine-l-Alleud', -26], ['Bruxelles-Midi', -10]],
     after: [['Bruxelles-Luxembourg', 12]],
@@ -75,6 +83,8 @@ const TRAINS = [
     // long via list on a long-ish destination
     train: 'S1', number: '1852', destination: 'Anvers-Berchem', minutes: 9,
     occupancy: 'high',
+    // a real window this train has simply not been seen in often enough
+    performance: { windowDays: 30, samples: 4 },
     platform: '5',
     before: [['Nivelles', -34], ['Bruxelles-Midi', -11]],
     after: [
@@ -167,6 +177,10 @@ const TRAINS = [
     // no via list at all, and the details overlay says so
     train: 'EST', number: '9412', destination: 'Amsterdam Centraal',
     minutes: 29, platform: '2', journey: false,
+    // no /vehicle journey, and a history all the same: the figures are
+    // keyed on the train number and this station, never on the route,
+    // so this row shows Performance with no map button beside it
+    performance: { windowDays: 30, samples: 22, medianSec: -70, onTimePct: 94, p90Sec: 500 },
   },
   {
     train: 'S2', number: '3641', destination: 'Louvain', minutes: 31,
@@ -289,4 +303,52 @@ export function getMockRoute(id, station) {
     ]);
   }
   return routeCache.get(key);
+}
+
+/* --- historical performance ---------------------------------------
+   Stands in for getPerformance(): the same four states, the same field
+   names, the same contract. It exists because the real figures come
+   from a static aggregate that is built by a scheduled workflow and
+   published on a separate branch, so on a dev machine there is nothing
+   to fetch and every train would answer `none` — which is exactly the
+   one state that shows none of the layout.
+
+   Nothing here computes a statistic either: the numbers are written
+   down, like every other value in this file. The publication
+   thresholds are applied rather than assumed, so a fixture can never
+   describe a cell the real build script could not have written — a
+   median under ten observations, or a p90 under twenty, is dropped
+   here the same way it would have been dropped there. */
+
+const MIN_SAMPLES = 10;
+const MIN_SAMPLES_P90 = 20;
+
+const byNumber = new Map(TRAINS.map((t) => [t.number, t]));
+
+const NONE = { state: 'none' };
+
+export function getMockPerformance(trainNumber) {
+  const spec = byNumber.get(String(trainNumber))?.performance;
+  if (!spec) return NONE;
+
+  if (spec.collectingDays) {
+    return { state: 'collecting', daysAvailable: spec.collectingDays, throughDay: null };
+  }
+
+  const enough = spec.samples >= MIN_SAMPLES && Number.isFinite(spec.medianSec);
+  return {
+    state: 'ok',
+    windowDays: spec.windowDays,
+    // Always fresh here: the date is only ever printed once the window
+    // has fallen behind, and a fixture that is behind says nothing
+    // useful about the layout.
+    throughDay: null,
+    samples: spec.samples,
+    enough,
+    medianSec: enough ? spec.medianSec : null,
+    onTimePct: enough ? spec.onTimePct : null,
+    p90Sec: enough && spec.samples >= MIN_SAMPLES_P90 && Number.isFinite(spec.p90Sec)
+      ? spec.p90Sec
+      : null,
+  };
 }

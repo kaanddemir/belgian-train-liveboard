@@ -2085,23 +2085,34 @@ body.modal-open{ overflow:hidden; }
    the route: one divider colour, one weight, running the panel's full
    width exactly as the row's separator does inside the panel.
 
-   The passenger load sits on the left and the way in to the map on the
-   right. On a narrow panel the two wrap onto separate lines and the
-   button keeps the right edge, so it never lands under the occupancy
-   figures. */
+   The passenger load sits on the left and the two ways out of the panel
+   — the historical figures and the map — sit together on the right as
+   one action group. One row at every width: the occupancy reading is
+   the only thing that may give ground, and on a phone it gives its
+   wording rather than its figures. */
 .train-details__footer{
   flex:0 0 auto;
   display:flex;
-  flex-wrap:wrap;
   align-items:center;
-  gap:var(--space-2) var(--space-4);
+  gap:var(--space-4);
   padding:var(--space-4) var(--pad-l);
   border-top:1px solid var(--color-divider);
 }
-.train-details__map-open{
-  /* Always the right edge, with or without an occupancy line beside it,
-     and still on the right when the two wrap onto separate lines. */
+/* The right-hand pair, held together so they never separate and never
+   drift apart as the panel narrows. `auto` on the left keeps them at
+   the right edge with or without an occupancy reading beside them. */
+.train-details__actions{
+  flex:0 0 auto;
   margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:var(--space-2);
+}
+/* Neither label ever folds onto a second line; the occupancy reading is
+   what absorbs a narrow panel. */
+.train-details__map-open,
+.train-details__disclose{ white-space:nowrap; }
+.train-details__map-open{
   display:inline-flex;
   align-items:center;
   gap:var(--space-2);
@@ -2129,6 +2140,140 @@ body.modal-open{ overflow:hidden; }
 .train-details__map-open:focus-visible{
   outline:2px solid var(--color-destination);
   outline-offset:2px;
+}
+
+/* The way in to the historical figures, beside the way in to the map
+   and built from the same pill: same height, same border, same states.
+   It is a disclosure rather than a second view, so it carries no arrow
+   and no chevron — the section it opens sits directly below it. */
+.train-details__disclose{
+  display:inline-flex;
+  align-items:center;
+  gap:var(--space-2);
+  padding:var(--space-2) var(--space-4);
+  border:1px solid rgba(255, 255, 255, .28);
+  border-radius:var(--radius-pill);
+  background:transparent;
+  color:var(--color-board-text);
+  font-family:inherit;
+  font-size:var(--font-size-secondary);
+  font-weight:var(--font-weight-bold);
+  cursor:pointer;
+  transition:background var(--transition-fast), border-color var(--transition-fast);
+}
+.train-details__disclose svg{
+  width:1.15em;
+  height:1.15em;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linejoin:round;
+  stroke-linecap:round;
+}
+.train-details__disclose:hover{ background:var(--color-control-hover); border-color:rgba(255, 255, 255, .5); }
+.train-details__disclose:active{ background:var(--color-control-active); }
+.train-details__disclose[aria-expanded="true"]{ background:var(--color-control-hover); }
+.train-details__disclose:focus-visible{
+  outline:2px solid var(--color-destination);
+  outline-offset:2px;
+}
+
+/* =========================
+   Historical performance
+   ========================= */
+/* How this train has run at this station over the last 30 service
+   days. It is the panel's last section and its quietest: three small
+   figures on the board's own blue, closed off above by the same
+   divider that separates every other section from the one before it.
+
+   No card, no tile, no chart. Each figure is three lines in a column —
+   what it is, what it reads, what it counts — because a number and the
+   words that qualify it belong together. Labels hard left and values
+   hard right would put half a panel between the two, and at this width
+   that is a gap to be read across rather than a pair to be read. */
+.train-performance{
+  flex:0 0 auto;
+  padding:var(--space-4) var(--pad-l) var(--space-5);
+  border-top:1px solid var(--color-divider);
+}
+.train-performance__title{
+  margin:0;
+  font-size:var(--font-size-meta);
+  font-weight:var(--font-weight-bold);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--color-board-text);
+}
+/* The window and the sample size. Secondary on purpose: it is the line
+   that keeps the three figures honest, not one of the figures. */
+.train-performance__meta{
+  margin:var(--space-1) 0 0;
+  font-size:var(--font-size-meta);
+  color:var(--color-board-text);
+  opacity:var(--color-board-muted);
+}
+.train-performance__empty{
+  margin:var(--space-3) 0 0;
+  font-size:var(--font-size-secondary);
+  color:var(--color-board-text);
+  opacity:var(--color-board-muted);
+}
+/* Three even columns, so no figure is given more room than another and
+   the reading always sits under the label it belongs to. A metric that
+   is not published simply leaves its column empty; the other two keep
+   their width rather than stretching to fill the panel. */
+.train-performance__list{
+  margin:var(--space-3) 0 0;
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:var(--space-4);
+}
+/* Centred inside its own third, not as part of one centred block: the
+   three columns keep their existing tracks and each figure sits over
+   the middle of its own. That is what keeps the label, the number and
+   the gloss reading as one thing rather than three lines that happen
+   to start at the same x. */
+.train-performance__metric{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  gap:var(--space-1);
+  /* a long translation wraps inside its own column rather than
+     widening the track */
+  min-width:0;
+}
+.train-performance__label{
+  font-size:var(--font-size-meta);
+  color:var(--color-board-text);
+  opacity:var(--color-board-muted);
+}
+.train-performance__reading{
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-1);
+  color:var(--color-board-text);
+}
+/* The figure itself, and the only thing in the section that is meant
+   to be read from across a concourse. Derived from the panel's own
+   secondary size rather than given a size of its own. */
+.train-performance__value{
+  font-size:calc(var(--font-size-secondary) * 1.25);
+  font-weight:var(--font-weight-bold);
+  font-variant-numeric:tabular-nums;
+  line-height:1.15;
+  /* a figure never folds onto a second line */
+  white-space:nowrap;
+}
+/* What the figure counts, under the figure rather than behind a hover:
+   a title attribute is unreachable by keyboard and invisible on a touch
+   screen, and the on-time threshold in particular is a convention
+   rather than a reading. */
+.train-performance__hint{
+  font-size:var(--font-size-meta);
+  font-weight:var(--font-weight-regular);
+  opacity:var(--color-board-muted);
 }
 
 /* =========================
@@ -2511,8 +2656,30 @@ body.modal-open{ overflow:hidden; }
   .train-map__popup .leaflet-popup-content{ max-width:min(72vw, 260px); }
   /* the foot of a full-height panel: it lands at the bottom because the
      route above it is the flexible section, not because it is pinned */
-  .train-details__footer{ padding:var(--space-4) var(--phone-edge); }
-  .train-details__map-open{ min-height:44px; }
+  .train-details__footer{ padding:var(--space-4) var(--phone-edge); gap:var(--space-2); }
+  .train-details__actions{ gap:var(--space-2); }
+  /* The pills keep their icon and their full wording on a phone — the
+     same labels the desktop shows, never reduced to icons and never
+     abbreviated. Only their side padding tightens, so both still fit
+     beside the occupancy figures at 390px. */
+  .train-details__map-open,
+  .train-details__disclose{ min-height:44px; padding-inline:var(--space-2); }
+  /* the same edge every other railway surface uses on a phone */
+  .train-performance{ padding:var(--space-4) var(--phone-edge) var(--space-5); }
+  /* Three columns at this width would be three cramped ones, so the
+     figures stack instead and keep their grouping down the page.
+     Stacked, they go back to the left edge: there is no column to be
+     centred in any more, and a centred block under a left-aligned
+     heading and metadata line would read as a misalignment rather than
+     as a centring. */
+  .train-performance__list{
+    grid-template-columns:1fr;
+    gap:var(--space-3);
+  }
+  .train-performance__metric{
+    align-items:flex-start;
+    text-align:left;
+  }
   /* the About panel folds the same way the details panel does */
   .about-overlay{ padding:0; align-items:stretch; overflow-y:auto; }
   .about-panel{
@@ -2526,7 +2693,29 @@ body.modal-open{ overflow:hidden; }
 
   /* The footer around it owns the edge padding now; only the reading's
      own type size is a phone concern. */
-  .train-occupancy{ font-size:15px; }
+  .train-occupancy{
+    font-size:15px;
+    /* Below the layout's narrowest target the reading gives way rather
+       than pushing the actions off the panel; the row never scrolls
+       sideways. */
+    min-width:0;
+    overflow:hidden;
+  }
+  /* At 390px the wording is what the row cannot afford, so the figures
+     stay and the words step out of the layout — still read aloud, and
+     still the thing that carries the meaning for anyone who cannot see
+     the figures' colour. */
+  .train-occupancy__label{
+    position:absolute;
+    width:1px;
+    height:1px;
+    padding:0;
+    margin:-1px;
+    overflow:hidden;
+    clip:rect(0, 0, 0, 0);
+    white-space:nowrap;
+    border:0;
+  }
 
   /* no hover on a phone: the detail opens inside the stop instead, so
      neither the tooltip nor the pointer that belongs to it is drawn */

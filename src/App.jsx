@@ -7,6 +7,8 @@ import AboutModal from './components/AboutModal.jsx';
 import {
   getLiveboard, getStops, getRoute, getStations, stationToSlug, findStationBySlug,
 } from './services/irail.js';
+import { getPerformance, peekPerformance } from './services/punctuality.js';
+import { stationPerformanceKey } from './data/rail/normalizeStationName.js';
 
 /* === CONFIGURATION ============================================== */
 
@@ -102,6 +104,17 @@ function mockResult(stops) {
   return stops ? { status: 'ok', stops } : { status: 'unavailable', stops: null };
 }
 
+// The historical figures come from a static aggregate a scheduled
+// workflow publishes on a separate branch, so on a dev machine there is
+// nothing to fetch and every train answers `none` — the one state that
+// shows none of the section. The fixture answers the same four states
+// in the same shape instead, on the same dead branch as everything else
+// here. It is a second source, never a second rendering path: the panel
+// below is handed one object and cannot tell which one wrote it.
+function mockPerformance(trainNumber) {
+  return mockSource().then((m) => m.getMockPerformance(trainNumber));
+}
+
 /* === WORDING ==================================================== */
 
 // The four languages iRail serves; the globe in the title bar picks one
@@ -112,6 +125,11 @@ const LANGUAGES = [
   { code: 'en', label: 'EN' },
   { code: 'de', label: 'DE' },
 ];
+
+// Only for the one date the Performance section can print — the last
+// service day its window covers, and only once that window has fallen
+// behind. Belgian forms where there is one.
+const DATE_LOCALES = { nl: 'nl-BE', fr: 'fr-BE', en: 'en-GB', de: 'de-DE' };
 
 const TEXT = {
   nl: {
@@ -147,6 +165,7 @@ const TEXT = {
     aboutData: 'Live spoorweggegevens worden geleverd via de',
     aboutIRail: 'iRail API',
     aboutMapData: 'De optionele routekaart tekent het spoortracé op basis van open data van Infrabel (CC0); de achtergrondkaart is © OpenStreetMap-bijdragers. Het tracé volgt echte spoorlijnen, maar de sporen waarover de trein precies rijdt, kunnen afwijken.',
+    aboutPerformance: 'De prestatiecijfers bij de treindetails zijn gebaseerd op ruwe stiptheidsgegevens uit de open data van Infrabel (CC0), over de laatste 30 dienstdagen. Ze worden door deze onafhankelijke site berekend en zijn geen officiële statistieken van Infrabel of SNCB/NMBS.',
     aboutLive: 'De informatie wordt uitsluitend ter informatie getoond. Live vertrektijden, vertragingen, sporen, afschaffingen en andere dienstinformatie kunnen soms onvolledig, vertraagd, onnauwkeurig of tijdelijk niet beschikbaar zijn.',
     aboutOfficial: 'Raadpleeg voor officiële reisinformatie',
     aboutOfficialSuffix: 'of de betrokken spoorwegmaatschappij.',
@@ -187,6 +206,23 @@ const TEXT = {
     routeFilter: (from, to) => `${from} → ${to}`,
     clearFilter: 'Bestemmingsfilter wissen',
     occupancy: { low: 'Lage bezetting', medium: 'Gemiddelde bezetting', high: 'Hoge bezetting' },
+    performance: 'Prestaties',
+    minutesShort: 'min',
+    performanceWindow: (days) => `Laatste ${days} dagen`,
+    performanceThrough: (through) => `t/m ${through}`,
+    performanceJourneys: (n) => `${n} vergelijkbare ${n === 1 ? 'rit' : 'ritten'}`,
+    performanceCollecting: (n) => `Geschiedenis wordt opgebouwd · ${n} ${n === 1 ? 'dag' : 'dagen'} beschikbaar`,
+    performanceLoading: 'Historische prestaties laden…',
+    performanceNoneYet: 'Nog geen historische gegevens beschikbaar',
+    performanceNotEnoughYet: 'Nog te weinig historische gegevens',
+    performanceNotComparable: 'Nog te weinig vergelijkbare ritten',
+    performanceStale: 'Historische gegevens zijn niet actueel',
+    typicalDelay: 'Gebruikelijke vertraging',
+    typicalDelayHint: 'Mediane vertraging',
+    onTimeRate: 'Stiptheid',
+    onTimeRateHint: 'Minder dan 6 min vertraging',
+    p90Label: '90% komt aan binnen',
+    p90Hint: '90% van de aankomsten',
   },
   fr: {
     title: 'Départ',
@@ -221,6 +257,7 @@ const TEXT = {
     aboutData: 'Les données ferroviaires en temps réel sont fournies via',
     aboutIRail: 'l’API iRail',
     aboutMapData: 'La carte optionnelle du parcours trace la voie à partir des données ouvertes d’Infrabel (CC0) ; le fond de carte est © les contributeurs d’OpenStreetMap. Le tracé suit de vraies lignes ferroviaires, mais les voies exactement empruntées par le train peuvent différer.',
+    aboutPerformance: 'Les chiffres de ponctualité affichés dans les détails du train proviennent des données brutes de ponctualité publiées en open data par Infrabel (CC0), sur les 30 derniers jours de service. Ils sont calculés par ce site indépendant et ne constituent pas des statistiques officielles d’Infrabel ou de SNCB/NMBS.',
     aboutLive: "Les informations sont fournies à titre informatif uniquement. Les heures de départ, retards, voies, suppressions et autres informations de service en temps réel peuvent parfois être incomplets, retardés, inexacts ou temporairement indisponibles.",
     aboutOfficial: 'Pour obtenir des informations de voyage officielles, consultez',
     aboutOfficialSuffix: 'ou l’opérateur ferroviaire concerné.',
@@ -261,6 +298,23 @@ const TEXT = {
     routeFilter: (from, to) => `${from} → ${to}`,
     clearFilter: 'Effacer le filtre de destination',
     occupancy: { low: 'Faible affluence', medium: 'Affluence moyenne', high: 'Forte affluence' },
+    performance: 'Ponctualité',
+    minutesShort: 'min',
+    performanceWindow: (days) => `${days} derniers jours`,
+    performanceThrough: (through) => `jusqu’au ${through}`,
+    performanceJourneys: (n) => `${n} trajet${n === 1 ? '' : 's'} comparable${n === 1 ? '' : 's'}`,
+    performanceCollecting: (n) => `Historique en cours de constitution · ${n} jour${n === 1 ? '' : 's'} disponible${n === 1 ? '' : 's'}`,
+    performanceLoading: 'Chargement des données de ponctualité…',
+    performanceNoneYet: 'Aucune donnée historique disponible pour l’instant',
+    performanceNotEnoughYet: 'Pas encore assez de données historiques',
+    performanceNotComparable: 'Pas encore assez de trajets comparables',
+    performanceStale: 'Les données historiques ne sont pas à jour',
+    typicalDelay: 'Retard habituel',
+    typicalDelayHint: 'Retard médian',
+    onTimeRate: 'Taux de ponctualité',
+    onTimeRateHint: 'Moins de 6 min de retard',
+    p90Label: '90% arrivent en moins de',
+    p90Hint: '90% des arrivées',
   },
   en: {
     title: 'Departures',
@@ -295,6 +349,7 @@ const TEXT = {
     aboutData: 'Live railway data is provided through the',
     aboutIRail: 'iRail API',
     aboutMapData: 'The optional route map draws the railway line from Infrabel open data (CC0); the base map is © OpenStreetMap contributors. The line follows real railway lines, but the exact tracks used by the train may differ.',
+    aboutPerformance: 'The performance figures in the train details are derived from raw punctuality data published as Infrabel Open Data (CC0), over the last 30 service days. They are calculated by this independent site and are not official Infrabel or SNCB/NMBS statistics.',
     aboutLive: 'Information shown here is provided for informational purposes only. Live departure times, delays, platforms, cancellations and other service information may occasionally be incomplete, delayed, inaccurate or temporarily unavailable.',
     aboutOfficial: 'For official travel information, please consult',
     aboutOfficialSuffix: 'or the relevant railway operator.',
@@ -335,6 +390,23 @@ const TEXT = {
     routeFilter: (from, to) => `${from} → ${to}`,
     clearFilter: 'Clear destination filter',
     occupancy: { low: 'Low occupancy', medium: 'Medium occupancy', high: 'High occupancy' },
+    performance: 'Performance',
+    minutesShort: 'min',
+    performanceWindow: (days) => `Last ${days} days`,
+    performanceThrough: (through) => `through ${through}`,
+    performanceJourneys: (n) => `${n} comparable ${n === 1 ? 'journey' : 'journeys'}`,
+    performanceCollecting: (n) => `Collecting history · ${n} ${n === 1 ? 'day' : 'days'} available`,
+    performanceLoading: 'Loading historical performance…',
+    performanceNoneYet: 'No historical data available yet',
+    performanceNotEnoughYet: 'Not enough historical data yet',
+    performanceNotComparable: 'Not enough comparable journeys yet',
+    performanceStale: 'Historical data is not up to date',
+    typicalDelay: 'Typical Delay',
+    typicalDelayHint: 'Median delay',
+    onTimeRate: 'On-Time Rate',
+    onTimeRateHint: 'Under 6 min delay',
+    p90Label: '90% Arrive Within',
+    p90Hint: '90% of arrivals',
   },
   de: {
     title: 'Abfahrt',
@@ -369,6 +441,7 @@ const TEXT = {
     aboutData: 'Live-Bahndaten werden über die',
     aboutIRail: 'iRail API',
     aboutMapData: 'Die optionale Streckenkarte zeichnet den Verlauf auf Basis offener Daten von Infrabel (CC0); die Hintergrundkarte stammt von © OpenStreetMap-Mitwirkenden. Der Verlauf folgt echten Bahnstrecken, die genauen Gleise, auf denen der Zug fährt, können jedoch abweichen.',
+    aboutPerformance: 'Die Pünktlichkeitswerte in den Zugdetails beruhen auf den Rohdaten zur Pünktlichkeit aus den offenen Daten von Infrabel (CC0) der letzten 30 Betriebstage. Sie werden von dieser unabhängigen Website berechnet und sind keine offiziellen Statistiken von Infrabel oder SNCB/NMBS.',
     aboutLive: 'Die hier gezeigten Informationen dienen ausschließlich Informationszwecken. Live-Abfahrtszeiten, Verspätungen, Gleise, Zugausfälle und andere Betriebsinformationen können gelegentlich unvollständig, verspätet, ungenau oder vorübergehend nicht verfügbar sein.',
     aboutOfficial: 'Offizielle Reiseinformationen erhalten Sie bei',
     aboutOfficialSuffix: 'oder dem jeweiligen Eisenbahnunternehmen.',
@@ -409,6 +482,23 @@ const TEXT = {
     routeFilter: (from, to) => `${from} → ${to}`,
     clearFilter: 'Zielfilter löschen',
     occupancy: { low: 'Geringe Auslastung', medium: 'Mittlere Auslastung', high: 'Hohe Auslastung' },
+    performance: 'Pünktlichkeit',
+    minutesShort: 'Min.',
+    performanceWindow: (days) => `Letzte ${days} Tage`,
+    performanceThrough: (through) => `bis ${through}`,
+    performanceJourneys: (n) => `${n} vergleichbare ${n === 1 ? 'Fahrt' : 'Fahrten'}`,
+    performanceCollecting: (n) => `Verlauf wird erfasst · ${n} ${n === 1 ? 'Tag' : 'Tage'} verfügbar`,
+    performanceLoading: 'Historische Pünktlichkeitsdaten werden geladen…',
+    performanceNoneYet: 'Noch keine historischen Daten verfügbar',
+    performanceNotEnoughYet: 'Noch zu wenige historische Daten',
+    performanceNotComparable: 'Noch zu wenige vergleichbare Fahrten',
+    performanceStale: 'Historische Daten sind nicht aktuell',
+    typicalDelay: 'Übliche Verspätung',
+    typicalDelayHint: 'Median der Verspätung',
+    onTimeRate: 'Pünktlichkeitsrate',
+    onTimeRateHint: 'Weniger als 6 Min. Verspätung',
+    p90Label: '90% kommen an innerhalb von',
+    p90Hint: '90% der Ankünfte',
   },
 };
 
@@ -543,6 +633,13 @@ export default function App() {
   const [openId, setOpenId] = useState(null);
   const [route, setRoute] = useState(null);        // the full /vehicle journey
   const [routeLoading, setRouteLoading] = useState(false);
+  // How this train has run at this station over the last 30 service
+  // days, from the static Infrabel aggregate. Independent of `route`:
+  // it is keyed on the train number and the board's own station, so a
+  // train with no /vehicle journey can still have a history.
+  // Tagged with the departure it belongs to, so a result that lands
+  // after the reader has moved on is never drawn under another train.
+  const [performance, setPerformance] = useState(null);
   const [board, setBoard] = useState(null);        // last successfully loaded board
   // Journey results by departure id — the shared { status, stops } shape
   // getStops returns, never a bare stop list, so an unavailable journey
@@ -860,6 +957,58 @@ export default function App() {
     return () => { cancelled = true; };
   }, [selectedDeparture?.vehicleId, selectedDeparture?.id, lang]);
 
+  // The historical figures, from a static file on this same origin.
+  // Deliberately not chained to the route above: nothing here needs the
+  // journey, so a slow or missing /vehicle never holds it up, and a
+  // train iRail has no journey for can still show a history.
+  //
+  // One shard per hundred train numbers, fetched the first time a train
+  // in that range is opened and kept for the session. The board itself
+  // asks for none of this, and every failure resolves to null.
+  const stationKey = useMemo(() => stationPerformanceKey(station), [station]);
+
+  // The date is only ever shown once the window has fallen behind, and
+  // it is formatted here because App is where the display language is.
+  const withLabel = useCallback((result) => (result && {
+    ...result,
+    throughLabel: result.throughDay
+      ? new Intl.DateTimeFormat(DATE_LOCALES[lang] ?? 'en-GB', {
+        day: 'numeric', month: 'short', timeZone: 'Europe/Brussels',
+      }).format(new Date(`${result.throughDay}T12:00:00Z`))
+      : null,
+  }), [lang]);
+
+  useEffect(() => {
+    if (!selectedDeparture) { setPerformance(null); return undefined; }
+    let cancelled = false;
+    (MOCK
+      ? mockPerformance(selectedDeparture.trainNumber)
+      : getPerformance(selectedDeparture.trainNumber, stationKey))
+      .then((result) => {
+        // A later open has already superseded this one.
+        if (cancelled) return;
+        setPerformance({ id: selectedDeparture.id, result: withLabel(result) });
+      });
+    return () => { cancelled = true; };
+  }, [selectedDeparture?.id, selectedDeparture?.trainNumber, stationKey, withLabel]);
+
+  // What the panel is actually shown. A result already in hand is read
+  // straight out of the session cache during render, so a second train
+  // in the same hundred draws its figures in the very first frame
+  // rather than blinking through "loading" on the way to them. Null
+  // means the shard is genuinely still in flight, and only then does
+  // the panel show its loading state — never the previous train's
+  // figures, because the stored result is tagged with its departure.
+  const shownPerformance = useMemo(() => {
+    if (!selectedDeparture) return null;
+    if (performance?.id === selectedDeparture.id) return performance.result;
+    // The session cache belongs to the real service; the fixture has no
+    // shard to have fetched, so the mock board simply waits one tick
+    // for the effect above and shows the loading state meanwhile.
+    if (MOCK) return null;
+    return withLabel(peekPerformance(selectedDeparture.trainNumber, stationKey));
+  }, [performance, selectedDeparture?.id, selectedDeparture?.trainNumber, stationKey, withLabel]);
+
   /* --- clock-independent chrome: layout class, row count, title --- */
 
   useEffect(() => {
@@ -1061,6 +1210,7 @@ export default function App() {
         departure={selectedDeparture}
         route={route}
         loading={routeLoading}
+        performance={shownPerformance}
         stationId={station.id}
         layout={CONFIG.layout}
         viaStops={CONFIG.viaStops}

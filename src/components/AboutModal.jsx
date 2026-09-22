@@ -108,6 +108,11 @@ export default function AboutModal({ open, t, onClose }) {
               named here rather than crowding the map itself, which
               carries only its one "approximate route" label. */}
           <p>{t.aboutMapData}</p>
+          {/* The Performance section is the one place the board shows
+              anything historical, and its numbers are this site's own
+              arithmetic over Infrabel's open data — not a figure either
+              railway company publishes. Said here, once. */}
+          <p>{t.aboutPerformance}</p>
           <p className="about-panel__note">{t.aboutLive}</p>
           <p>
             {t.aboutOfficial}{' '}

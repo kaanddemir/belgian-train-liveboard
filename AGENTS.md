@@ -36,7 +36,8 @@ main.jsx  →  App
              │                      inline in App.jsx)
              ├── StationModal      (station picker / From -> To form)
              ├── TrainDetailsModal (train details overlay)
-             │   └── TrainRouteMap (lazy, the map view of that same panel)
+             │   ├── TrainRouteMap (lazy, the map view of that same panel)
+             │   └── Performance    (historical figures, inline disclosure)
              └── AboutModal        (about / disclaimer panel)
 ```
 
@@ -85,8 +86,19 @@ src/components/TrainRouteMap.jsx  The optional route map. Lazy-loaded; the only
                                 module that imports Leaflet.
 src/services/railRoute.js       Rail graph fetch/cache, iRail-to-Infrabel station
                                 matching, Dijkstra, geometry concatenation.
+src/services/punctuality.js     Historical Performance: shard fetch, session memoisation,
+                                staleness, and the null-on-anything-wrong contract.
+                                Never computes a statistic.
+scripts/data/build-punctuality.mjs
+                                Infrabel punctuality pipeline. Run by a schedule, not by
+                                the build. Node stdlib only.
+.github/workflows/punctuality.yml
+                                The only thing that ever talks to Infrabel for punctuality.
+                                Writes the orphan `data` branch.
 src/data/rail/normalizeStationName.js  The one station-name normaliser, shared by
-                                the build script and the runtime.
+                                the build scripts and the runtime. Also exports
+                                stationPerformanceKey(), the key both halves of
+                                Performance must agree on exactly.
 src/data/rail/stationAliases.js Verified iRail/Infrabel name differences.
 public/generated/belgian-rail-graph.json  Generated. Never imported — fetched at
                                 runtime after the map is opened.
@@ -412,6 +424,167 @@ scripts/data/build-rail-network.mjs
   drawn along the line they are replacing. `isRoadService()` keeps them
   off the rails; keep that guard.
 
+## Historical Performance rules
+
+The Performance section in `TrainDetailsModal` is the only historical
+thing on the board. Everything else is live iRail.
+
+- It answers exactly one question: **how has this train run at this
+  station?** It is historical, never predictive, and never a forecast
+  about today's train. Do not add a route analysis, a journey duration,
+  a destination prediction, a chart, a sparkline or a trend line.
+- **Three metrics, and only three**, all of them the same sample of
+  signed `DELAY_ARR` seconds over the same window, so one sample count
+  speaks for all of them and is always shown:
+
+  ```text
+  Typical Delay           median                     n >= 10
+  On-Time Rate            share with delay < 360 s   n >= 10
+  90% Arrive Within       p90, rounded up            n >= 20
+  ```
+
+  The thresholds count observations **inside the selected window**, and
+  reaching ten needs ten *covered* days — which is why the 10-day tier
+  requires all ten. A train that did not run every one of those days
+  still falls short, and the panel then says "not enough comparable
+  journeys" under a real window label. That is correct behaviour, not a
+  build failure.
+
+  Do not add Average Delay, a cancellation rate, a reliability score or
+  a fourth row.
+- **The section always renders**, from the moment the panel opens.
+  When there is nothing to say it says which nothing it is, and the five
+  states are never run together: `loading` (the shard is in flight),
+  `none` (no usable dataset), `collecting` (fresh but no window yet),
+  `stale` (the newest day is too old) and `ok` (a window qualified,
+  which may still be short of comparable journeys for this train).
+- A shard already fetched this session is read synchronously with
+  `peekPerformance()` during render, so a second train in the same
+  hundred shows its figures in the first frame instead of blinking
+  through the loading state. It starts no request and changes no cache.
+- **The window adapts.** The build picks the largest trailing window the
+  state genuinely covers and names it: 30 days (≥27 covered), else 15
+  (≥14), else 10 (all 10). Below that nothing is named and the panel
+  says it is collecting, counting the days it holds inside the last ten.
+- **Ten days is the floor, and it demands all ten.** A train calls at a
+  station about once a day, so an n-day window yields at most n
+  observations for it, and ten is exactly what a median or a percentage
+  needs. A 7-day window could never reach it, and a 10-day window
+  missing one day would top out at nine — both would have shown a
+  real-looking window label above no figures. Do not lower this floor or
+  add a shorter tier without revisiting MIN_SAMPLES — they are one
+  decision seen from either end.
+- Every window is measured over the **real trailing calendar days ending
+  at the newest service day**, never over "whichever days we happen to
+  have". Ten August days and one September day are not "the last 10
+  days" — that state has a trailing-10 coverage of one.
+- **Figures come only from the selected window's days.** A 30-day median
+  relabelled "Last 7 days" would be a different number about a different
+  fortnight. The days outside the window are not read at all.
+- Selection depends only on which dates exist, which is one fact about
+  the whole dataset, so it is decided **once at build time** and the
+  aggregate carries one window's figures. Do not publish a variant per
+  window: measured, that is 2.8× the payload for no added correctness.
+- **Coverage and staleness are different questions and both must pass.**
+  `g` says how old the newest included day is; `a` says which days are
+  there. A day missing from the dataset is not a day a train did not run
+  — a train that did not run contributes no observation and the sample
+  count carries that, whereas a missing day removes every train's
+  observations at once and reshapes the sample rather than shrinking it.
+- The browser re-derives the window from `a` and **refuses any shard
+  whose `w` its own dates do not support**. A shard with no `a` is
+  unusable — never assume coverage.
+- Identity is `(departure.trainNumber, stationPerformanceKey(station))`.
+  The iRail train number is Infrabel's `TRAIN_NO`. Never key on
+  `RELATION` or `RELATION_DIRECTION`: they describe the relation, not
+  the run, and about 15% of train numbers change their label within a
+  month.
+- Station matching reuses `normalizeStationName()` and
+  `STATION_ALIASES`. Do not build a second station-name system. An
+  Infrabel stopping point that is not a known iRail passenger station is
+  dropped, never guessed at — about 6% of rows are junctions, sidings,
+  depots and freight points.
+- Negative delays are **kept signed** at every stage. About a third of
+  all observations are early; clamping them would bias every median
+  upward.
+- Only four source columns are retained: `DATDEP`, `TRAIN_NO`,
+  `PTCAR_LG_NM_NL`, `DELAY_ARR`. Do not start keeping planned or actual
+  datetime fields again — no published metric needs them.
+- **The browser never contacts Infrabel**, never parses a CSV and never
+  computes a median or a percentile. `src/services/punctuality.js`
+  fetches one precomputed shard and picks one cell out of it.
+- The shard follows from `departure.trainNumber` alone
+  (`Math.floor(number / 100)`). No index request, no manifest lookup
+  before the lookup.
+- Nothing is fetched for a board row. The shard is requested only when
+  Train Details opens, and is memoised for the session.
+- Performance is **independent of the route**. It is keyed on the train
+  number and the board's station, so it must not wait for `/vehicle`
+  and must still render for a train that has no journey. Only the map
+  waits for a route.
+- Every failure resolves to `null`: a 404, a broken file, an unknown
+  train, a station this train does not call at, or an aggregate more
+  than seven days stale. Performance must never surface an error in the
+  overlay, and must never break the row, the timeline or the map.
+- Below `n = 10` the panel names the sample and says the data is
+  insufficient. Rows collapse rather than showing a placeholder or a
+  dash. Never pad the section back to three rows.
+- The `< 6 minutes` threshold is a reporting convention, not something
+  the dataset defines, so the UI prints it in words beside the
+  percentage. It must stay visible text — never a `title` attribute,
+  which is unreachable by keyboard and invisible on touch.
+- It is a **disclosure inside the existing panel**, not a third view.
+  It adds no layer to the Escape ladder and no second "back" control.
+- All wording goes through `TEXT` in `App.jsx` in all four languages,
+  like everything else.
+
+## Performance data pipeline rules
+
+- `main` contains **code and workflows only**. The rolling 30-day state
+  and the generated shards live on the orphan `data` branch: no shared
+  history, never merged, one force-replaced commit. Never commit the
+  observations or the daily generated output into `main` — deleting a
+  file later does not remove it from history.
+- The `data` branch is replaced **only after** the ingest has been
+  validated and the aggregate has been recomputed and checked. A failed
+  ingest must leave the last good published state exactly as it is.
+- Infrabel's D-1 dataset is **overwritten every morning**, so a day not
+  collected is lost until the monthly file lands about a month later.
+  That is why ingestion runs three times a day and why the run exits
+  before downloading anything once the day is already in state.
+- Ingest validation is not decoration. Implausible row, train or
+  stopping-point counts, or a station match rate below its established
+  level, must fail the run and publish nothing.
+- The size-drift guard compares like with like: it is skipped when the
+  selected window changed, because a window narrowing from 30 days to 7
+  is *expected* to shrink the aggregate by most of its size, and
+  guarding that would turn a self-healing coverage dip into a failing
+  pipeline. It is also skipped when the previous output used a different
+  schema.
+- The output invariants in `validateOutput()` are checked on every path
+  and can never be waived: shard placement, sample counts, figures
+  agreeing with their thresholds in *both* directions, no null or
+  non-finite value, no unexpected field. The size-drift check is the one
+  heuristic, and only an explicit `--backfill` may exceed it — a
+  backfill exists to fill a gap, so it may grow the aggregate, but never
+  shrink it, and it skips nothing else.
+- **Nothing is written until every check has passed.** Writing the
+  shards before the drift check would leave a rejected build on disk and
+  make it the baseline the next run compares against, so simply
+  re-running a rejected build would accept it. The match rate is the
+  silent-drift risk: it is the only thing that would let a rename in the
+  station column quietly empty the board.
+- `state/manifest.json` records which service days are present and which
+  are missing. A gap is logged and repaired from the monthly file — it
+  is never fabricated, and the website is never responsible for
+  recovery.
+- A push made with `GITHUB_TOKEN` does not trigger other workflows, so
+  the ingest asks for the Pages deploy explicitly. Do not assume the
+  push alone republishes the site.
+- No PAT. The built-in token pushes within this repository and
+  dispatches the deploy; keep the permissions at the minimum the two
+  workflows already declare.
+
 ## URL rules
 
 - The visible URL carries a readable station slug
@@ -576,6 +749,10 @@ npm run build     # production bundle in dist/
 npm run preview   # serve the production bundle
 
 node scripts/data/build-rail-network.mjs   # regenerate the rail graph
+
+node scripts/data/build-punctuality.mjs --daily           # ingest the published D-1 day
+node scripts/data/build-punctuality.mjs --backfill 202608 # seed/repair from a monthly file
+node scripts/data/build-punctuality.mjs --aggregate       # rebuild shards from state
 ```
 
 The rail graph is regenerated by hand, not on install or build. Re-run it
@@ -606,3 +783,8 @@ Before considering a change complete:
 10. No new dependencies were introduced.
 11. No new CSS colours, breakpoints or one-off magic numbers outside the
     token system.
+12. Performance still degrades to nothing on a 404, a malformed shard, an
+    unknown train, an unknown station or a stale aggregate, and Train
+    Details keeps working in every one of those cases.
+13. The board still fetches no Performance shard; only opening a train
+    does, and a second train in the same hundred reuses it.

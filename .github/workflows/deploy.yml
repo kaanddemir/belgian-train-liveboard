@@ -25,6 +25,52 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The historical Performance shards are operational output, not
+      # source: they are regenerated every day and live on the orphan
+      # `data` branch so main's history does not grow by a few megabytes
+      # a day. They join the site here, in the Pages artifact, which is
+      # not git history at all.
+      #
+      # Their absence is not a failure. The board, the timeline and the
+      # map do not depend on them, and the Performance section simply
+      # does not render when its shard is missing.
+      #
+      # Written so that no step in it can fail the deploy: the live board
+      # must publish whether or not the historical half exists yet, and
+      # right now it does not. Each stage is guarded individually rather
+      # than relying on a pipeline's exit status, and the step ends in
+      # `:` so the last command is always a success.
+      - name: Overlay the Performance shards from the data branch
+        run: |
+          set +e
+          if ! git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            echo "no data branch yet — deploying the board without Performance data"
+            exit 0
+          fi
+          if ! git fetch --depth 1 origin data >/dev/null 2>&1; then
+            echo "could not fetch the data branch — deploying without Performance data"
+            exit 0
+          fi
+          # Ask the tree directly instead of letting `git archive` fail
+          # inside a pipe, where tar's exit status would hide it.
+          if ! git ls-tree --name-only FETCH_HEAD generated/performance >/dev/null 2>&1 \
+             || [ -z "$(git ls-tree --name-only FETCH_HEAD generated/performance)" ]; then
+            echo "data branch carries no shards yet — deploying without Performance data"
+            exit 0
+          fi
+          mkdir -p dist
+          if ! git archive FETCH_HEAD generated/performance >/tmp/shards.tar 2>/dev/null; then
+            echo "could not read the shards — deploying without Performance data"
+            exit 0
+          fi
+          tar -x -C dist -f /tmp/shards.tar 2>/dev/null
+          count=$(ls dist/generated/performance/*.json 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$count" -gt 0 ]; then
+            echo "overlaid $count shard(s)"
+          else
+            echo "no shards extracted — deploying without Performance data"
+          fi
+          :
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -39,3 +39,22 @@ export function normalizeStationName(value) {
     .replace(/[^a-z0-9]+/g, '-')       // spaces, dots, slashes, brackets
     .replace(/^-+|-+$/g, '');
 }
+
+/* ------------------------------------------------------------------
+   The one key a station is known by outside iRail.
+
+   Two consumers have to agree on it exactly, or a lookup silently
+   misses: scripts/data/build-punctuality.mjs, which labels every
+   Infrabel observation with it, and src/services/punctuality.js, which
+   looks the board's own station up by it. Keeping it here, beside the
+   normaliser it is built from, is what stops the two drifting apart.
+
+   `standardname` is the source because iRail returns it identically in
+   all four languages, so the key does not change meaning with the
+   display language — the same reason stationToSlug() uses it. A
+   bilingual name is reduced to its first half, deterministically.
+   ------------------------------------------------------------------ */
+export function stationPerformanceKey(station) {
+  const source = station?.standardname || station?.name || '';
+  return normalizeStationName(source.split('/')[0] || source);
+}

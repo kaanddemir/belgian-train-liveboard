@@ -140,8 +140,124 @@ function OccupancyIcons({ level }) {
   );
 }
 
+/* --- historical performance ---------------------------------------
+   How this train has run at this station over the last 30 service
+   days, from the static Infrabel aggregate App fetched. Three figures,
+   all of them the same sample described three ways, so one count in
+   the heading speaks for all of them.
+
+   Nothing is computed here: the median, the percentage and the p90
+   were decided by the build script. This only turns seconds into the
+   minutes a reader reads. */
+
+// Delay, to the nearest minute and always signed — except at zero,
+// where "+0 min" would claim a precision the rounding does not have.
+// Early is a real answer and keeps its sign.
+function delayMinutes(seconds) {
+  const minutes = Math.round(seconds / 60);
+  if (minutes === 0) return '0';
+  return minutes > 0 ? `+${minutes}` : `−${Math.abs(minutes)}`;
+}
+
+// A containment claim — "9 in 10 arrive within this" — so it rounds up,
+// never down: rounding 11.4 down would make the sentence false. A train
+// whose ninth-in-ten arrival is early still contains at zero.
+function containmentMinutes(seconds) {
+  return seconds <= 0 ? '+0' : `+${Math.ceil(seconds / 60)}`;
+}
+
+// The line under the heading: which window, how far behind it is if it
+// has fallen behind, and how many journeys it rests on. Built from
+// pieces rather than one sentence per combination, because the window
+// varies and the count is not always meaningful.
+function metaLine(performance, t) {
+  if (performance.state !== 'ok' && performance.state !== 'collecting') return null;
+  if (performance.state === 'collecting') {
+    return t.performanceCollecting(performance.daysAvailable);
+  }
+  return [
+    t.performanceWindow(performance.windowDays),
+    performance.throughLabel ? t.performanceThrough(performance.throughLabel) : null,
+    performance.samples > 0 ? t.performanceJourneys(performance.samples) : null,
+  ].filter(Boolean).join(' \u00b7 ');
+}
+
+// One figure, read as one thing: the label, the number under it and
+// the line that says what the number counts. The pair stays a <dt> and
+// a <dd> — a term and its description is exactly what this is — and the
+// gloss sits inside the description because it qualifies the figure,
+// not the heading. A screen reader reads "Typical Delay: +3 min, median
+// delay", which is the sentence the three lines draw.
+function Metric({ label, value, hint }) {
+  return (
+    <div className="train-performance__metric">
+      <dt className="train-performance__label">{label}</dt>
+      <dd className="train-performance__reading">
+        <span className="train-performance__value">{value}</span>
+        <span className="train-performance__hint">{hint}</span>
+      </dd>
+    </div>
+  );
+}
+
+function TrainPerformance({ performance, t, id }) {
+  // No result yet means the shard is still in flight. The section is
+  // drawn from the moment the panel opens either way, so nothing below
+  // it moves when the figures arrive.
+  const state = performance?.state ?? 'loading';
+  const meta = performance ? metaLine(performance, t) : null;
+  // Which sentence stands in for the figures, when there are none.
+  // Each says a different thing and they must not be run together:
+  // still fetching, no data at all, a window still filling, a window we
+  // cannot trust the age of, or a window that simply has not seen this
+  // train here often enough.
+  const message = state === 'loading' ? t.performanceLoading
+    : state === 'none' ? t.performanceNoneYet
+      : state === 'stale' ? t.performanceStale
+        : state === 'collecting' ? t.performanceNotEnoughYet
+          : !performance.enough ? t.performanceNotComparable
+            : null;
+
+  return (
+    <section className="train-performance" id={id} aria-label={t.performance}>
+      <h2 className="train-performance__title">{t.performance}</h2>
+      {meta && <p className="train-performance__meta">{meta}</p>}
+
+      {message ? (
+        <p className="train-performance__empty" role="status">{message}</p>
+      ) : (
+        <dl className="train-performance__list">
+          <Metric
+            label={t.typicalDelay}
+            value={`${delayMinutes(performance.medianSec)}\u00a0${t.minutesShort}`}
+            hint={t.typicalDelayHint}
+          />
+          {/* The threshold is a reporting convention, not something the
+              reader can infer from "On-Time Rate", so it is printed
+              rather than hidden behind a hover. It is this metric's own
+              gloss, in the same place as the other two. */}
+          <Metric
+            label={t.onTimeRate}
+            value={`${performance.onTimePct}%`}
+            hint={t.onTimeRateHint}
+          />
+          {/* Absent under twenty observations: a tail needs a sample
+              before it means anything. The metric simply is not there. */}
+          {performance.p90Sec !== null && (
+            <Metric
+              label={t.p90Label}
+              value={`${containmentMinutes(performance.p90Sec)}\u00a0${t.minutesShort}`}
+              hint={t.p90Hint}
+            />
+          )}
+        </dl>
+      )}
+    </section>
+  );
+}
+
 export default function TrainDetailsModal({
-  departure, route, loading, stationId, layout, viaStops, t, onClose,
+  departure, route, loading, performance, stationId, layout, viaStops, t, onClose,
 }) {
   // Which stop the phone has opened. Desktop uses hover instead, so this
   // stays null there; either way only one stop is ever active.
@@ -151,6 +267,10 @@ export default function TrainDetailsModal({
   const [mapOpen, setMapOpen] = useState(false);
   // The accuracy note, folded behind the info control in the title bar.
   const [infoOpen, setInfoOpen] = useState(false);
+  // The historical figures, folded away until asked for. A disclosure,
+  // not a view: it adds no layer to the Escape ladder and no second
+  // "back" control — the panel still has exactly one way out.
+  const [perfOpen, setPerfOpen] = useState(false);
   // No extra lookup: `train` / `trainNumber` are the normalised identity
   // the board row already prints.
   const trainLabel = [departure?.train, departure?.trainNumber]
@@ -162,6 +282,7 @@ export default function TrainDetailsModal({
   const backRef = useRef(null);
   const timelineId = useId();
   const infoId = useId();
+  const perfId = useId();
   const [phoneDetails, setPhoneDetails] = useState(
     () => window.matchMedia(PHONE_QUERY).matches);
 
@@ -204,9 +325,11 @@ export default function TrainDetailsModal({
     // Focus goes into the dialog and comes back to the row afterwards.
     openerRef.current = document.activeElement;
     setActiveStop(null);
-    // A different train must never inherit the previous one's map.
+    // A different train must never inherit the previous one's map,
+    // nor the previous one's figures.
     setMapOpen(false);
     setInfoOpen(false);
+    setPerfOpen(false);
     const id = requestAnimationFrame(() => closeRef.current?.focus());
     const onKey = (e) => {
       if (e.key === 'Escape') {
@@ -404,14 +527,24 @@ export default function TrainDetailsModal({
                 })}
               </ol>
             </div>
+          </>
+        )}
 
-            {/* 3. the panel's foot, closed off by the same rule that
-                separates the departure row from the route above it.
+        {/* 3. the panel's foot, closed off by the same rule that
+            separates the departure row from the route above it.
 
-                It carries the reported passenger load — still secondary,
-                still absent entirely when iRail sent no reading, never an
-                empty slot and never "unknown" — and, opposite it, the one
-                way in to the optional map. */}
+            It carries the reported passenger load — still secondary,
+            still absent entirely when iRail sent no reading, never an
+            empty slot and never "unknown" — and, opposite it, the way
+            in to the historical figures and the way in to the map.
+
+            It is deliberately outside the `route` branch above. The
+            figures are keyed on the train number and this station, not
+            on the journey, so a train iRail has no /vehicle route for
+            still has a history worth showing. Only the map needs the
+            route, so only the map's button waits for one. */}
+        {!mapOpen && !loading && (
+          <>
             <div className="train-details__footer">
               {occupancy && (
                 <p className={`train-occupancy is-${occupancy}`}>
@@ -419,20 +552,50 @@ export default function TrainDetailsModal({
                   <span className="train-occupancy__label">{t.occupancy[occupancy]}</span>
                 </p>
               )}
-              <button
-                type="button"
-                className="train-details__map-open"
-                onClick={() => setMapOpen(true)}
-                ref={openMapRef}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <polygon points="3,6 9,3 15,6 21,3 21,18 15,21 9,18 3,21" />
-                  <line x1="9" y1="3" x2="9" y2="18" />
-                  <line x1="15" y1="6" x2="15" y2="21" />
-                </svg>
-                {t.openMap}
-              </button>
+              {/* The two ways out of this panel, kept together as one
+                  group on the right so they read as a pair at every
+                  width and never wrap apart. */}
+              <div className="train-details__actions">
+                {/* A disclosure, not a view. It is always offered, from
+                    the moment the panel opens: the section always has
+                    something to say, even if that is only that it is
+                    still fetching. */}
+                <button
+                  type="button"
+                  className="train-details__disclose"
+                  onClick={() => setPerfOpen((v) => !v)}
+                  aria-expanded={perfOpen}
+                  aria-controls={perfOpen ? perfId : undefined}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="4,15.5 10,9.5 14,13.5 20,7.5" />
+                    <polyline points="15.5,7.5 20,7.5 20,12" />
+                  </svg>
+                  {t.performance}
+                </button>
+                {/* The map is the one thing here that genuinely needs the
+                    journey, so it is the one thing gated on it. */}
+                {route && (
+                  <button
+                    type="button"
+                    className="train-details__map-open"
+                    onClick={() => setMapOpen(true)}
+                    ref={openMapRef}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <polygon points="3,6 9,3 15,6 21,3 21,18 15,21 9,18 3,21" />
+                      <line x1="9" y1="3" x2="9" y2="18" />
+                      <line x1="15" y1="6" x2="15" y2="21" />
+                    </svg>
+                    {t.openMap}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {perfOpen && (
+              <TrainPerformance performance={performance} t={t} id={perfId} />
+            )}
           </>
         )}
       </section>
