@@ -8,7 +8,7 @@ This is an independent, non-commercial project. It is not affiliated with, spons
 
 ## Data and accuracy
 
-Departure times, delays, platforms, cancellations, routes and other service information may be delayed, incomplete, inaccurate or unavailable. Route maps show an approximate path along real railway lines, not necessarily the exact tracks a train uses.
+Departure and arrival times, delays, platforms, cancellations, routes and other service information may be delayed, incomplete, inaccurate or unavailable. Route maps show an approximate path along real railway lines, not necessarily the exact tracks a train uses.
 
 Always verify important travel information with [SNCB/NMBS](https://www.belgiantrain.be/) or the relevant railway operator.
 

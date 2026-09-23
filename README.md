@@ -1,6 +1,6 @@
 # Belgian Train Liveboard
 
-Belgian Train Liveboard is an independent, unofficial, non-commercial web application for viewing live SNCB/NMBS departures in a station-display-inspired interface. It uses public railway information from [iRail](https://docs.irail.be/).
+Belgian Train Liveboard is an independent, unofficial, non-commercial web application for viewing live SNCB/NMBS departures and arrivals in a station-display-inspired interface. It uses public railway information from [iRail](https://docs.irail.be/).
 
 **Live Demo:** [trainboard.be](https://trainboard.be/)
 
@@ -71,7 +71,7 @@ Kiosk mode does not enter browser fullscreen; Full screen stays a separate menu 
 
 ## Data Sources
 
-- [iRail](https://docs.irail.be/) provides the station list, liveboard departures, delays, platforms, alerts, and train route information. The browser calls its public API directly; no private SNCB/NMBS API is used.
+- [iRail](https://docs.irail.be/) provides the station list, liveboard departures and arrivals, delays, platforms, alerts, and train route information. The browser calls its public API directly; no private SNCB/NMBS API is used.
 - [Infrabel Open Data](https://opendata.infrabel.be/) provides the public, CC0 railway datasets preprocessed into the local graph used for route geometry. Routes follow real infrastructure but are approximate; they do not claim to show the exact track used by a train.
 - Infrabel Open Data also provides the raw punctuality observations behind Historical Performance, via `ruwe-gegevens-van-stiptheid-d-1` (yesterday's arrivals and departures) and `stiptheid-gegevens-maandelijksebestanden` (the same rows per month, used for the initial backfill and to repair a missed day). The figures shown are calculated by this project, not published by Infrabel or SNCB/NMBS.
 - [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors provide the map tiles and map-data attribution. OpenStreetMap is not a timetable source.
