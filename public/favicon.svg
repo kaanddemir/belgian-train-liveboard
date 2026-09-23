@@ -1,31 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Master application icon. The custom B combines a train windscreen in
-       its upper counter with a rounded train front and headlights below. -->
+  <!-- Master application icon: a train front on its track, embedded as
+       a raster so every icon size comes from the same artwork. -->
   <defs>
     <clipPath id="icon-shape">
       <rect width="512" height="512" rx="72"/>
     </clipPath>
   </defs>
-
-  <g clip-path="url(#icon-shape)">
-    <rect width="512" height="512" fill="#0f3054"/>
-    <rect width="512" height="80" fill="#008fe8"/>
-  </g>
-
-  <path fill="#ffcc05" fill-rule="evenodd" d="
-    M160 142H284c62 0 100 31 100 81 0 28-14 51-40 65
-    36 16 56 46 56 82 0 50-40 76-108 76H160c-21 0-34-13-34-34V176
-    c0-21 13-34 34-34Z
-
-    M184 184c-7 0-10 4-10 11v52c0 8 4 11 11 11h94
-    c33 0 51-13 51-37 0-23-19-37-51-37h-95Z
-
-    M184 318c-8 0-12 4-12 12v62c0 8 4 12 12 12h103
-    c38 0 59-14 59-42 0-27-21-44-59-44H184Z"/>
-
-  <!-- The windscreen dividers and headlights are part of the B itself,
-       keeping the train cue legible without introducing a separate mark. -->
-  <path fill="#ffcc05" d="M220 192h20l-35 58h-20Zm37 0h20l-35 58h-20Z"/>
-  <circle cx="207" cy="370" r="13" fill="#ffcc05"/>
-  <circle cx="311" cy="370" r="13" fill="#ffcc05"/>
+  <image clip-path="url(#icon-shape)" width="512" height="512" href="data:image/png;base64,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"/>
 </svg>
