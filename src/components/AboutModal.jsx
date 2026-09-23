@@ -4,6 +4,8 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabin
 
 const IRAIL_DOCS = 'https://docs.irail.be/';
 const SNCB_NMBS = 'https://www.belgiantrain.be/';
+const CONTACT_EMAIL = 'heykaan.dev@gmail.com';
+const CONTACT_GITHUB = 'https://github.com/kaanddemir';
 
 /* ------------------------------------------------------------------
    About — the same panel the train details use, with prose instead of
@@ -13,12 +15,13 @@ const SNCB_NMBS = 'https://www.belgiantrain.be/';
 
    Every sentence comes from the TEXT map in App.jsx, so the panel
    follows the language the board is set to. `kind` picks which of the
-   two informational faces it shows — 'about' or 'legal' — so only one
-   can ever be open, and both share one focus and Escape behaviour.
+   three informational faces it shows — 'about', 'legal' or 'contact' —
+   so only one
+   can ever be open, and all share one focus and Escape behaviour.
    ------------------------------------------------------------------ */
 export default function AboutModal({ kind, t, onClose }) {
-  const open = kind === 'about' || kind === 'legal';
-  const title = kind === 'legal' ? t.legal : t.about;
+  const open = kind === 'about' || kind === 'legal' || kind === 'contact';
+  const title = kind === 'legal' ? t.legal : kind === 'contact' ? t.contact : t.about;
   const closeRef = useRef(null);
   const openerRef = useRef(null);
   const dialogRef = useRef(null);
@@ -93,7 +96,32 @@ export default function AboutModal({ kind, t, onClose }) {
           </button>
         </header>
 
-        {kind === 'legal' ? (
+        {kind === 'contact' ? (
+          <div className="about-panel__body">
+            <p>{t.contactIntro}</p>
+            <section className="about-panel__section">
+              <h2 className="about-panel__heading">{t.contactEmail}</h2>
+              <p>
+                <a className="about-panel__link" href={`mailto:${CONTACT_EMAIL}`}>
+                  {CONTACT_EMAIL}
+                </a>
+              </p>
+            </section>
+            <section className="about-panel__section">
+              <h2 className="about-panel__heading">{t.contactGitHub}</h2>
+              <p>
+                <a
+                  className="about-panel__link"
+                  href={CONTACT_GITHUB}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  github.com/kaanddemir
+                </a>
+              </p>
+            </section>
+          </div>
+        ) : kind === 'legal' ? (
           <div className="about-panel__body">
             {t.legalSections.map(([heading, text]) => (
               <section key={heading} className="about-panel__section">

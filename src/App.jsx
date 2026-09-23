@@ -231,6 +231,10 @@ const TEXT = {
     aboutOfficial: 'Raadpleeg voor officiële reisinformatie',
     aboutOfficialSuffix: 'of de betrokken spoorwegmaatschappij.',
     legal: 'Juridisch & disclaimer',
+    contact: 'Contact',
+    contactIntro: 'Vragen, feedback of foutmeldingen?',
+    contactEmail: 'E-mail',
+    contactGitHub: 'GitHub',
     legalSections: [
       ['Onafhankelijk project', 'Deze site is niet verbonden aan, gesponsord, goedgekeurd of uitgebaat door SNCB/NMBS, Infrabel, iRail of een andere spoorwegmaatschappij.'],
       ['Gegevens en nauwkeurigheid', 'Vertrektijden, vertragingen, sporen, afschaffingen en andere dienstinformatie kunnen vertraagd, onvolledig, onjuist of niet beschikbaar zijn. Controleer belangrijke reisinformatie altijd bij officiële bronnen.'],
@@ -354,6 +358,10 @@ const TEXT = {
     aboutOfficial: 'Pour obtenir des informations de voyage officielles, consultez',
     aboutOfficialSuffix: 'ou l’opérateur ferroviaire concerné.',
     legal: 'Mentions légales',
+    contact: 'Contact',
+    contactIntro: 'Des questions, des remarques ou un bug à signaler ?',
+    contactEmail: 'E-mail',
+    contactGitHub: 'GitHub',
     legalSections: [
       ['Projet indépendant', 'Ce site n’est ni affilié à, ni sponsorisé, approuvé ou exploité par SNCB/NMBS, Infrabel, iRail ou tout autre opérateur ferroviaire.'],
       ['Données et exactitude', 'Les heures de départ, retards, voies, suppressions et autres informations de service peuvent être retardés, incomplets, inexacts ou indisponibles. Vérifiez toujours les informations importantes auprès des sources officielles.'],
@@ -477,6 +485,10 @@ const TEXT = {
     aboutOfficial: 'For official travel information, please consult',
     aboutOfficialSuffix: 'or the relevant railway operator.',
     legal: 'Legal & Disclaimer',
+    contact: 'Contact',
+    contactIntro: 'Questions, feedback or bug reports?',
+    contactEmail: 'Email',
+    contactGitHub: 'GitHub',
     legalSections: [
       ['Independent project', 'This site is not affiliated with, sponsored by, endorsed by, or operated by SNCB/NMBS, Infrabel, iRail or any railway operator.'],
       ['Data and accuracy', 'Departure times, delays, platforms, cancellations and other service information may be delayed, incomplete, inaccurate or unavailable. Always verify important travel information with official sources.'],
@@ -600,6 +612,10 @@ const TEXT = {
     aboutOfficial: 'Offizielle Reiseinformationen erhalten Sie bei',
     aboutOfficialSuffix: 'oder dem jeweiligen Eisenbahnunternehmen.',
     legal: 'Rechtliches & Haftungsausschluss',
+    contact: 'Kontakt',
+    contactIntro: 'Fragen, Feedback oder Fehlermeldungen?',
+    contactEmail: 'E-Mail',
+    contactGitHub: 'GitHub',
     legalSections: [
       ['Unabhängiges Projekt', 'Diese Website ist weder mit SNCB/NMBS, Infrabel, iRail oder einem anderen Eisenbahnunternehmen verbunden noch von ihnen gesponsert, empfohlen oder betrieben.'],
       ['Daten und Genauigkeit', 'Abfahrtszeiten, Verspätungen, Gleise, Zugausfälle und andere Betriebsinformationen können verzögert, unvollständig, ungenau oder nicht verfügbar sein. Prüfen Sie wichtige Reiseinformationen stets bei offiziellen Quellen.'],
@@ -1635,6 +1651,7 @@ export default function App() {
 
   const openAbout = useCallback(() => setInfo('about'), []);
   const openLegal = useCallback(() => setInfo('legal'), []);
+  const openContact = useCallback(() => setInfo('contact'), []);
   const closeInfo = useCallback(() => setInfo(null), []);
 
   // Keep obscured application content out of both keyboard navigation and
@@ -1684,11 +1701,13 @@ export default function App() {
         menuLabel={t.menu}
         aboutLabel={t.about}
         legalLabel={t.legal}
+        contactLabel={t.contact}
         stationLabel={t.stationLabel}
         updatedLabel={t.updated}
         updatedAt={updatedAt}
         onAbout={openAbout}
         onLegal={openLegal}
+        onContact={openContact}
       />
 
       <DepartureBoard

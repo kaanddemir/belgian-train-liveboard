@@ -50,7 +50,7 @@ export default function Header({
   fullscreenLabel, fullscreenExitLabel,
   kiosk = false, kioskLabel, onKiosk,
   boardMode = 'departures', boardLabels = {}, boardPickLabel, onBoard, onBoardMenu,
-  menuLabel, aboutLabel, onAbout, legalLabel, onLegal,
+  menuLabel, aboutLabel, onAbout, legalLabel, onLegal, contactLabel, onContact,
   stationLabel, updatedLabel, updatedAt,
 }) {
   const fullscreen = useFullscreen();
@@ -397,6 +397,20 @@ export default function Header({
                   <line x1="10" y1="15.5" x2="15" y2="15.5" />
                 </svg>
                 {legalLabel}
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                className="topbar-menu-item topbar-menu-item--row"
+                onClick={() => { closeMenu({ restoreFocus: false }); onContact?.(); }}
+              >
+                {/* an envelope */}
+                <svg className="topbar-menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3.5" y="6" width="17" height="12" rx="1" />
+                  <path d="M3.5 7l8.5 6.5 8.5-6.5" />
+                </svg>
+                {contactLabel}
               </button>
 
               {/* What the title bar carries on wide screens and drops when
