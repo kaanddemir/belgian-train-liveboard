@@ -2123,6 +2123,9 @@ body.modal-open{ overflow:hidden; }
 }
 .about-panel__link{
   color:var(--color-board-text);
+  /* the repository address is one long token; let it wrap on a phone
+     instead of pushing the panel sideways */
+  overflow-wrap:anywhere;
   text-underline-offset:.2em;
   border-radius:var(--radius-sm);
 }

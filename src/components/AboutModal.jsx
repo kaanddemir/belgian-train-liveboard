@@ -6,6 +6,7 @@ const IRAIL_DOCS = 'https://docs.irail.be/';
 const SNCB_NMBS = 'https://www.belgiantrain.be/';
 const CONTACT_EMAIL = 'heykaan.dev@gmail.com';
 const CONTACT_GITHUB = 'https://github.com/kaanddemir';
+const CONTACT_SOURCE = 'https://github.com/kaanddemir/belgian-train-liveboard';
 
 /* ------------------------------------------------------------------
    About — the same panel the train details use, with prose instead of
@@ -117,6 +118,19 @@ export default function AboutModal({ kind, t, onClose }) {
                   rel="noopener noreferrer"
                 >
                   github.com/kaanddemir
+                </a>
+              </p>
+            </section>
+            <section className="about-panel__section">
+              <h2 className="about-panel__heading">{t.contactSource}</h2>
+              <p>
+                <a
+                  className="about-panel__link"
+                  href={CONTACT_SOURCE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  github.com/kaanddemir/belgian-train-liveboard
                 </a>
               </p>
             </section>

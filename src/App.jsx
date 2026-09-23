@@ -235,6 +235,7 @@ const TEXT = {
     contactIntro: 'Vragen, feedback of foutmeldingen?',
     contactEmail: 'E-mail',
     contactGitHub: 'GitHub',
+    contactSource: 'Broncode',
     legalSections: [
       ['Onafhankelijk project', 'Deze site is niet verbonden aan, gesponsord, goedgekeurd of uitgebaat door SNCB/NMBS, Infrabel, iRail of een andere spoorwegmaatschappij.'],
       ['Gegevens en nauwkeurigheid', 'Vertrek- en aankomsttijden, vertragingen, sporen, afschaffingen en andere dienstinformatie kunnen vertraagd, onvolledig, onjuist of niet beschikbaar zijn. Controleer belangrijke reisinformatie altijd bij officiële bronnen.'],
@@ -363,6 +364,7 @@ const TEXT = {
     contactIntro: 'Des questions, des remarques ou un bug à signaler ?',
     contactEmail: 'E-mail',
     contactGitHub: 'GitHub',
+    contactSource: 'Code source',
     legalSections: [
       ['Projet indépendant', 'Ce site n’est ni affilié à, ni sponsorisé, approuvé ou exploité par SNCB/NMBS, Infrabel, iRail ou tout autre opérateur ferroviaire.'],
       ['Données et exactitude', 'Les heures de départ et d’arrivée, retards, voies, suppressions et autres informations de service peuvent être retardés, incomplets, inexacts ou indisponibles. Vérifiez toujours les informations importantes auprès des sources officielles.'],
@@ -491,6 +493,7 @@ const TEXT = {
     contactIntro: 'Questions, feedback or bug reports?',
     contactEmail: 'Email',
     contactGitHub: 'GitHub',
+    contactSource: 'Source code',
     legalSections: [
       ['Independent project', 'This site is not affiliated with, sponsored by, endorsed by, or operated by SNCB/NMBS, Infrabel, iRail or any railway operator.'],
       ['Data and accuracy', 'Departure and arrival times, delays, platforms, cancellations and other service information may be delayed, incomplete, inaccurate or unavailable. Always verify important travel information with official sources.'],
@@ -619,6 +622,7 @@ const TEXT = {
     contactIntro: 'Fragen, Feedback oder Fehlermeldungen?',
     contactEmail: 'E-Mail',
     contactGitHub: 'GitHub',
+    contactSource: 'Quellcode',
     legalSections: [
       ['Unabhängiges Projekt', 'Diese Website ist weder mit SNCB/NMBS, Infrabel, iRail oder einem anderen Eisenbahnunternehmen verbunden noch von ihnen gesponsert, empfohlen oder betrieben.'],
       ['Daten und Genauigkeit', 'Abfahrts- und Ankunftszeiten, Verspätungen, Gleise, Zugausfälle und andere Betriebsinformationen können verzögert, unvollständig, ungenau oder nicht verfügbar sein. Prüfen Sie wichtige Reiseinformationen stets bei offiziellen Quellen.'],
