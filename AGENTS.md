@@ -80,7 +80,7 @@ src/components/TrainDetailsModal.jsx  Train details overlay: the train's service
                                 import of the map view.
 src/components/AboutModal.jsx   The informational panel, two faces picked by `kind`:
                                 About (short plain-language summary) and Legal &
-                                Disclaimer (six short sections), all of it from TEXT.
+                                Disclaimer (seven short sections, ending with Privacy), all of it from TEXT.
 src/services/irail.js           All iRail communication, response normalisation,
                                 caching, the station search/ranking algorithm and
                                 nearestStation().

@@ -35,3 +35,11 @@ Do not rely on this project as your sole source for time-sensitive travel decisi
 ## Trademarks
 
 Names, logos and trademarks, including SNCB/NMBS, Infrabel and iRail, remain the property of their respective owners. Their inclusion does not imply affiliation or endorsement.
+
+## Privacy
+
+Belgian Train Liveboard does not require an account and does not use analytics or tracking.
+
+Your selected station, language and favourite stations are stored locally in your browser and are not sent to the project. Location is accessed only when you use the nearest-station feature; the app does not store or transmit your coordinates.
+
+Your browser connects directly to the [iRail API](https://docs.irail.be/), to [OpenStreetMap](https://www.openstreetmap.org/) when the map is opened, and to the site host. These services may receive technical information such as your IP address under their own privacy policies.
