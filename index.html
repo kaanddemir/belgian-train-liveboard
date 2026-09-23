@@ -13,7 +13,8 @@
 <link rel="preconnect" href="https://api.irail.be" crossorigin>
 
 <title>Belgian Train Liveboard</title>
-<meta name="description" content="Live Belgian train departures on a station-style board: real-time departures, delays and platforms, direct From → To filtering and full route details, powered by iRail.">
+<link rel="canonical" href="https://trainboard.be/">
+<meta name="description" content="Live Belgian train departures and arrivals on a station-style board: real-time delays and platforms, direct From → To filtering and full route details, powered by iRail.">
 <!-- The board's own surface colour (--color-board-bg), so the browser
      chrome matches the screen it frames. -->
 <meta name="theme-color" content="#0f3054">
@@ -27,19 +28,25 @@
      run JavaScript, so they only ever see this file; rewriting these tags
      per station at runtime would change nothing for them. The document
      title is the one thing that does follow the station, in App.jsx.
-     og:url, og:image and twitter:image are absolute-URL tags and wait for
-     a production domain. -->
+     og:url, og:image and twitter:image are absolute URLs on the
+     production domain; public/og-image.png is the 1200×630 preview. -->
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://trainboard.be/">
 <meta property="og:site_name" content="Belgian Train Liveboard">
 <meta property="og:title" content="Belgian Train Liveboard">
-<meta property="og:description" content="Live Belgian train departures on a station-style board: real-time departures, delays and platforms, direct From → To filtering and full route details, powered by iRail.">
+<meta property="og:description" content="Live Belgian train departures and arrivals on a station-style board: real-time delays and platforms, direct From → To filtering and full route details, powered by iRail.">
+<meta property="og:image" content="https://trainboard.be/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A live departure board from Bruxelles-Central next to the trainboard.be name and train icon">
 <meta property="og:locale" content="en_GB">
 <meta property="og:locale:alternate" content="fr_BE">
 <meta property="og:locale:alternate" content="nl_BE">
 <meta property="og:locale:alternate" content="de_BE">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Belgian Train Liveboard">
-<meta name="twitter:description" content="Live Belgian train departures on a station-style board: real-time departures, delays and platforms, direct From → To filtering and full route details, powered by iRail.">
+<meta name="twitter:image" content="https://trainboard.be/og-image.png">
+<meta name="twitter:description" content="Live Belgian train departures and arrivals on a station-style board: real-time delays and platforms, direct From → To filtering and full route details, powered by iRail.">
 </head>
 <body>
 <div id="root"></div>
