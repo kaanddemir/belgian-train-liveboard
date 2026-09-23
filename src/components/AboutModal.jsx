@@ -16,13 +16,16 @@ const CONTACT_SOURCE = 'https://github.com/kaanddemir/belgian-train-liveboard';
 
    Every sentence comes from the TEXT map in App.jsx, so the panel
    follows the language the board is set to. `kind` picks which of the
-   three informational faces it shows — 'about', 'legal' or 'contact' —
-   so only one
+   informational faces it shows — 'about', 'legal', 'contact' or
+   'disturbances' (iRail's network notices, passed in already
+   normalised to plain text) — so only one
    can ever be open, and all share one focus and Escape behaviour.
    ------------------------------------------------------------------ */
-export default function AboutModal({ kind, t, onClose }) {
-  const open = kind === 'about' || kind === 'legal' || kind === 'contact';
-  const title = kind === 'legal' ? t.legal : kind === 'contact' ? t.contact : t.about;
+const TITLES = { about: 'about', legal: 'legal', contact: 'contact', disturbances: 'disturbances' };
+
+export default function AboutModal({ kind, t, disturbances = [], dateLocale = 'en-GB', onClose }) {
+  const open = Object.hasOwn(TITLES, kind);
+  const title = open ? t[TITLES[kind]] : t.about;
   const closeRef = useRef(null);
   const openerRef = useRef(null);
   const dialogRef = useRef(null);
@@ -97,7 +100,38 @@ export default function AboutModal({ kind, t, onClose }) {
           </button>
         </header>
 
-        {kind === 'contact' ? (
+        {kind === 'disturbances' ? (
+          <div className="about-panel__body">
+            {disturbances.map((item) => (
+              <section key={item.key} className="about-panel__section about-panel__section--notice">
+                <h2 className="about-panel__heading">{item.title}</h2>
+                {item.time && (
+                  <p className="about-panel__note">
+                    <time dateTime={item.time.toISOString()}>
+                      {new Intl.DateTimeFormat(dateLocale, {
+                        timeZone: 'Europe/Brussels',
+                        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                      }).format(item.time)}
+                    </time>
+                  </p>
+                )}
+                {item.text && <p className="about-panel__text">{item.text}</p>}
+                {item.link && (
+                  <p>
+                    <a
+                      className="about-panel__link"
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {t.disturbanceLink}
+                    </a>
+                  </p>
+                )}
+              </section>
+            ))}
+          </div>
+        ) : kind === 'contact' ? (
           <div className="about-panel__body">
             <p>{t.contactIntro}</p>
             <section className="about-panel__section">

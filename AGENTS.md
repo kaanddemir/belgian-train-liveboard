@@ -78,13 +78,15 @@ src/components/TrainDetailsModal.jsx  Train details overlay: the train's service
                                 on a phone), stop details, occupancy, the footer
                                 actions (Performance, Open map), and the lazy
                                 import of the map view.
-src/components/AboutModal.jsx   The informational panel, two faces picked by `kind`:
-                                About (short plain-language summary) and Legal &
-                                Disclaimer (seven short sections, ending with Privacy), all of it from TEXT.
+src/components/AboutModal.jsx   The informational panel, faces picked by `kind`:
+                                About (short plain-language summary), Legal &
+                                Disclaimer (seven short sections, ending with Privacy),
+                                Contact, and the network disturbance list (plain text
+                                handed in by App.jsx). All wording from TEXT.
 src/services/irail.js           All iRail communication, response normalisation,
-                                caching, the station search/ranking algorithm and
-                                nearestStation().
-src/services/mockBoard.js       Development-only fixture board behind `?mock=1`.
+                                caching, the station search/ranking algorithm,
+                                nearestStation() and the /disturbances notices.
+src/services/mockBoard.js       Development-only named QA scenes behind `?mock=<scene>`.
                                 Never imported by a production build.
 src/components/TrainRouteMap.jsx  The optional route map. Lazy-loaded; the only
                                 module that imports Leaflet.
@@ -272,7 +274,7 @@ scripts/data/build-rail-network.mjs
 - iRail is the only source of railway data. Never fabricate, mock or
   extrapolate train information in the UI. The single exception is
   `src/services/mockBoard.js`, the visual test fixture: it is reached
-  only behind `import.meta.env.DEV` and `?mock=1`, both branches fold
+  only behind `import.meta.env.DEV` and `?mock=`, both branches fold
   away at build time, and nothing it returns can reach a shipped bundle.
   Keep it that way — never widen the gate, and never let a component
   import it.
@@ -709,6 +711,57 @@ thing on the board. Everything else is live iRail.
 - The title-bar board menu stays usable in kiosk. It reports its open
   state to `App.jsx` so Escape closes the menu before it can leave kiosk.
 
+## Development mock rules
+
+- Mock mode is DEV-only: `?mock=<scene>` on the Vite dev server. A
+  production build folds the flag to an empty string and never imports
+  `mockBoard.js`, so every `?mock=` value is inert there and no fixture
+  text ships. No hostname exception, no storage flag, no hidden control,
+  and never a fallback to mock data after an API error.
+- Scenes: `full` (`?mock=1` and any unknown name map here), `notices`,
+  `performance`, `loading`, `empty`, `few`, `offline`, `overnight`. One
+  scene is selected from the URL and every mock call answers from it.
+- Scenes are deterministic: times derive from a fixed reference
+  (18:00 Brussels on 23 Sep 2026; 23:40 for `overnight`), never the clock,
+  and nothing is random. The title-bar clock and "last updated" show that
+  time via Header's `fixedNow`, which the live board never sets.
+- In mock mode the liveboard, stops, route, Performance, the liveboard
+  alert and `/disturbances` all come from the scene; `/stations` and the
+  rail graph stay real. Disturbances go through the production
+  `normalizeDisturbances()`, and `offline` rejects the liveboard so App's
+  own error path draws the notice. Artificial delays exist only in the
+  `loading` scene.
+- Fixtures supply inputs and states only; production logic decides what
+  renders. Mocks conform to the UI, never the reverse.
+- Share always strips `mock`, like `kiosk`.
+
+## Network disturbance rules
+
+- `/disturbances` is **network-wide** SNCB information. It carries no
+  station, train or line identifiers, so it is never matched to the board,
+  a train, a route or Train Details — no name, substring or fuzzy search
+  of its free text, and no correlation with `/liveboard` alerts.
+- Only `type === "disturbance"` is surfaced. Planned works are left out on
+  purpose, and a notice iRail still classifies as a disturbance is shown
+  even if its title reads "restored" — never filter on wording.
+- Endpoint, validation, normalisation (plain text, http/https links only,
+  `parseUnixSeconds` times) and the cache live in `irail.js`. iRail's `id`
+  is a position in the response, never an identity.
+- Requests go through the shared scheduler at **normal** priority and are
+  **not** serial. The first one starts only after the first liveboard has
+  loaded; then every `CONFIG.disturbancesRefreshMs` (10 minutes), never on
+  the 30 s board cycle.
+- The last good list is kept per language, in memory only. A failed or
+  malformed refresh keeps it and says nothing; a valid response with no
+  disturbances clears it. A language switch shows only that language's
+  own list, or nothing until it arrives.
+- The strip is the last line of the notice stack, outside the single-slot
+  notice chain, so existing `/liveboard` alerts stay exactly as they were.
+  It opens the list outside kiosk and has an X that hides the current
+  set of notices until that set changes (session state only, never
+  stored); in kiosk the text is read-only and the X hides with the cursor,
+  like the kiosk exit button.
+
 ## Kiosk mode rules
 
 - Kiosk is URL-driven: active only when `kiosk=1`, read from the URL on
@@ -842,9 +895,11 @@ alias table changes, and commit the result.
 
 `npm test` runs Vitest (the one test dev dependency) in plain Node with
 the existing Vite config: no jsdom, no Testing Library, no browser. The
-suite in `test/` covers two things only — Historical Performance trust and
-eligibility (`test/performance.test.js`) and the midnight `/vehicle`
-service-day fix (`test/serviceDay.test.js`). `fetch` is always stubbed;
+suite in `test/` covers four things only — Historical Performance trust and
+eligibility (`test/performance.test.js`), the midnight `/vehicle`
+service-day fix (`test/serviceDay.test.js`) and the `/disturbances`
+normalisation and cache (`test/disturbances.test.js`), plus the dev mock
+scenes (`test/mockBoard.test.js`). `fetch` is always stubbed;
 the tests make no network request. Modules with session caches are
 re-imported per case with `vi.resetModules()`. `serviceDay`,
 `previousServiceDay` and `callsAt` are exported from `irail.js` for these

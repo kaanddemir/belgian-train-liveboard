@@ -629,6 +629,101 @@ export function getStations(lang = 'nl') {
   return stationsByLang.get(lang);
 }
 
+/* --- network disturbances ----------------------------------------- */
+
+// /disturbances is network-wide: SNCB's own service notices, with no
+// station, train or line identifiers in them. It is never matched against
+// the board — free text is not evidence. Only `type: "disturbance"` is
+// surfaced; planned works are left out on purpose.
+//
+// Titles, descriptions and some links are translated, so the last good list
+// is kept per language, in memory only. A failed refresh throws and leaves
+// that list alone; only a response that parses replaces it, empty included.
+const disturbancesByLang = new Map();
+const disturbancesInFlight = new Map();
+
+function plainText(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// Only a real web address is ever linked; anything else is dropped, never
+// repaired or guessed.
+function webLink(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+export function normalizeDisturbances(json) {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) {
+    throw new Error('iRail /disturbances: unusable response');
+  }
+  if (!('disturbance' in json) && !('version' in json)) {
+    throw new Error('iRail /disturbances: unusable response');
+  }
+  const raw = json.disturbance;
+  if (raw != null && typeof raw !== 'object') {
+    throw new Error('iRail /disturbances: unusable response');
+  }
+  // iRail's `id` is only the position in this response, so identity is
+  // built from what the notice actually says. Two different notices may
+  // share a title; a counter keeps even an identical pair apart.
+  const seen = new Map();
+  return asArray(raw)
+    .filter((item) => item && typeof item === 'object' && item.type === 'disturbance')
+    .map((item) => {
+      const title = plainText(item.title).replace(/\s+/g, ' ');
+      if (!title) return null;
+      const time = parseUnixSeconds(item.timestamp);
+      const link = webLink(item.link);
+      const base = `${title}|${time ? time.getTime() : ''}|${link || ''}`;
+      const count = seen.get(base) || 0;
+      seen.set(base, count + 1);
+      return {
+        key: count ? `${base}#${count}` : base,
+        type: 'disturbance',
+        title,
+        text: plainText(item.description),
+        time,
+        link,
+      };
+    })
+    .filter(Boolean);
+}
+
+// The last good list for `lang`, or null before one has arrived. Starts
+// no request.
+export function peekDisturbances(lang = 'nl') {
+  return disturbancesByLang.get(lang) ?? null;
+}
+
+// Background information, so normal priority and never serial: it waits
+// behind a board request and never joins the /vehicle lane.
+export function getDisturbances(lang = 'nl', signal) {
+  const pending = disturbancesInFlight.get(lang);
+  if (pending && !pending.signal?.aborted) return pending.promise;
+  const promise = request('/disturbances', { lang }, { signal })
+    .then((json) => {
+      const list = normalizeDisturbances(json);
+      disturbancesByLang.set(lang, list);
+      return list;
+    })
+    .finally(() => {
+      if (disturbancesInFlight.get(lang)?.promise === promise) disturbancesInFlight.delete(lang);
+    });
+  disturbancesInFlight.set(lang, { promise, signal });
+  return promise;
+}
+
 /* --- readable slugs ---------------------------------------------- */
 
 // The visible URL carries a readable slug, never an iRail id. The slug is

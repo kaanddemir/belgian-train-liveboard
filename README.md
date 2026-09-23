@@ -11,6 +11,7 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
 - Live station departures, refreshed every 30 seconds
 - Real-time delays, platforms, platform changes, cancellations, extra services, route changes, and service notices when supplied by iRail
 - Live arrivals on the same board, switched from the board title
+- Network-wide SNCB disruption notices from iRail in a quiet strip at the foot of the board
 - Search across Belgian stations using live iRail station data, opened from the search button or the station name
 - Nearest station from your location, on request only
 - Up to five favourite stations
@@ -57,7 +58,7 @@ Belgian Train Liveboard is an independent, unofficial, non-commercial web applic
   </tr>
 </table>
 
-Screenshots show Bruxelles-Central; displayed services vary with the current liveboard. The two Train Details images are captured from the development fixture board (`?mock=1`), so the Historical Performance section is visible without a published aggregate.
+Screenshots show Bruxelles-Central; displayed services vary with the current liveboard. The two Train Details images are captured from the development-only fixture board (`?mock=1` on the dev server), so the Historical Performance section is visible without a published aggregate.
 
 ### Arrivals
 
@@ -71,7 +72,7 @@ Kiosk mode does not enter browser fullscreen; Full screen stays a separate menu 
 
 ## Data Sources
 
-- [iRail](https://docs.irail.be/) provides the station list, liveboard departures and arrivals, delays, platforms, alerts, and train route information. The browser calls its public API directly; no private SNCB/NMBS API is used.
+- [iRail](https://docs.irail.be/) provides the station list, liveboard departures and arrivals, delays, platforms, alerts, network disruption notices, and train route information. The browser calls its public API directly; no private SNCB/NMBS API is used.
 - [Infrabel Open Data](https://opendata.infrabel.be/) provides the public, CC0 railway datasets preprocessed into the local graph used for route geometry. Routes follow real infrastructure but are approximate; they do not claim to show the exact track used by a train.
 - Infrabel Open Data also provides the raw punctuality observations behind Historical Performance, via `ruwe-gegevens-van-stiptheid-d-1` (yesterday's arrivals and departures) and `stiptheid-gegevens-maandelijksebestanden` (the same rows per month, used for the initial backfill and to repair a missed day). The figures shown are calculated by this project, not published by Infrabel or SNCB/NMBS.
 - [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors provide the map tiles and map-data attribution. OpenStreetMap is not a timetable source.

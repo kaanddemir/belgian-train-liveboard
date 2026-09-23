@@ -6,6 +6,7 @@ import TrainDetailsModal from './components/TrainDetailsModal.jsx';
 import AboutModal from './components/AboutModal.jsx';
 import {
   getLiveboard, getStops, getRoute, getStations, stationToSlug, findStationBySlug,
+  getDisturbances, peekDisturbances,
 } from './services/irail.js';
 import { getPerformance, peekPerformance } from './services/punctuality.js';
 import { stationPerformanceKey } from './data/rail/normalizeStationName.js';
@@ -89,6 +90,8 @@ const CONFIG = {
   layout: 'compact',
   lang: 'fr',            // nl | fr | en | de — the language the board starts in
   refreshMs: 30_000,     // live data refresh interval
+  // network service notices: slow background information, not a live feed
+  disturbancesRefreshMs: 10 * 60 * 1000,
   showStops: true,       // fetch the intermediate stations of each train
   maxStops: 0,           // platform layout: 0 = every stop; or cap at e.g. 3
   viaStops: 3,           // compact layout: intermediate stations printed inline
@@ -113,11 +116,13 @@ const STACKED_QUERY = '(max-width: 599px)';
 
 /* === DEVELOPMENT-ONLY VISUAL TEST MODE ========================== */
 
-// `?mock=1` on the dev server feeds the board the fixture in
-// src/services/mockBoard.js instead of iRail, so a sparse evening
-// liveboard still shows a full screen with a delayed, cancelled,
-// platform-changed and shortened row on it at once. It owns its own
-// parameter and leaves `?station=` alone, so the two combine.
+// `?mock=<scenario>` on the dev server feeds the board a named, fixed
+// scene from src/services/mockBoard.js instead of iRail (`?mock=1` is the
+// full board), so a sparse evening liveboard still shows a full screen
+// with a delayed, cancelled, platform-changed and shortened row on it at
+// once. It owns its own parameter and leaves `?station=` alone, so the two
+// combine. The scene decides the board, the journeys, the figures, the
+// alert and the network disturbances; no live iRail call is made for them.
 //
 // Every use below is written as `import.meta.env.DEV && mockRequested()`.
 // `import.meta.env.DEV` is a compile-time constant, so a production build
@@ -131,15 +136,19 @@ const MOCK_PARAM = 'mock';
 // the fixture — is removed as dead code. The shipped bundle carries no
 // mock data and no mock code path.
 const MOCK = import.meta.env.DEV
-  ? new URLSearchParams(window.location.search).get(MOCK_PARAM) === '1'
-  : false;
+  ? new URLSearchParams(window.location.search).get(MOCK_PARAM) || ''
+  : '';
 
 // The fixture is loaded on demand, so it stays out of the module graph
 // until the dev server is actually asked for it. The import sits inside
 // the same dead branch, which is what keeps it out of the production
 // bundle: with no live caller left, the function goes with it.
 async function mockSource() {
-  if (import.meta.env.DEV) return import('./services/mockBoard.js');
+  if (import.meta.env.DEV) {
+    const mock = await import('./services/mockBoard.js');
+    mock.selectMockScenario(MOCK);
+    return mock;
+  }
   return null;
 }
 
@@ -253,6 +262,9 @@ const TEXT = {
     details: 'Treindetails',
     close: 'Sluiten',
     dismissWarning: 'Melding sluiten',
+    disturbanceCount: (n) => (n === 1 ? '1 storingsmelding' : `${n} storingsmeldingen`),
+    disturbances: 'Storingen op het net',
+    disturbanceLink: 'Oorspronkelijk bericht',
     share: 'Delen',
     shareCopied: 'Link gekopieerd',
     shareFailed: 'Kon de link niet kopiëren. Kopieer hem hieronder:',
@@ -383,6 +395,9 @@ const TEXT = {
     details: 'Détails du train',
     close: 'Fermer',
     dismissWarning: 'Masquer l’avertissement',
+    disturbanceCount: (n) => (n === 1 ? '1 avis de perturbation' : `${n} avis de perturbation`),
+    disturbances: 'Perturbations sur le réseau',
+    disturbanceLink: 'Avis d’origine',
     share: 'Partager',
     shareCopied: 'Lien copié',
     shareFailed: 'Impossible de copier le lien. Copiez-le ci-dessous :',
@@ -513,6 +528,9 @@ const TEXT = {
     details: 'Train details',
     close: 'Close',
     dismissWarning: 'Dismiss warning',
+    disturbanceCount: (n) => (n === 1 ? '1 service notice' : `${n} service notices`),
+    disturbances: 'Service notices',
+    disturbanceLink: 'Original notice',
     share: 'Share',
     shareCopied: 'Link copied',
     shareFailed: 'Could not copy the link. Copy it below:',
@@ -643,6 +661,9 @@ const TEXT = {
     details: 'Zugdetails',
     close: 'Schließen',
     dismissWarning: 'Hinweis schließen',
+    disturbanceCount: (n) => (n === 1 ? '1 Störungsmeldung' : `${n} Störungsmeldungen`),
+    disturbances: 'Störungen im Netz',
+    disturbanceLink: 'Originalmeldung',
     share: 'Teilen',
     shareCopied: 'Link kopiert',
     shareFailed: 'Link konnte nicht kopiert werden. Bitte unten kopieren:',
@@ -920,6 +941,17 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState(null);
   const [rows, setRows] = useState(fitRows);
   const [lang, setLang] = useState(storedLang);    // nl | fr | en | de
+  // Network-wide service notices (type "disturbance" only), for `lang`.
+  const [disturbances, setDisturbances] = useState([]);
+  // Set once by the first board that loads, so the notices never take a
+  // network slot ahead of the board itself.
+  const [liveReady, setLiveReady] = useState(false);
+  // The set of notices the reader closed the strip on. A different set —
+  // a new notice, or one gone — brings the strip back.
+  const [dismissedNotices, setDismissedNotices] = useState('');
+  // Dev mock only: the scene's fixed time for the clock and "last updated",
+  // so screenshots repeat. Always null on the live board.
+  const [mockClock, setMockClock] = useState(null);
 
   // Dev only: the mock board labels itself with the station on screen,
   // while `refresh` keys on the id alone so filling in a name later never
@@ -1142,16 +1174,24 @@ export default function App() {
     refreshSequence.current = sequence;
     try {
       // Always the canonical iRail id — the slug never reaches the API.
-      const next = MOCK
-        ? (await mockSource()).getMockLiveboard(stationRef.current, boardMode)
-        : await getLiveboard(station.id, lang, signal, boardMode);
+      let next;
+      let shownAt = null;
+      if (MOCK) {
+        const mock = await mockSource();
+        shownAt = mock.mockNow();
+        setMockClock(shownAt);
+        next = await mock.getMockLiveboard(stationRef.current, boardMode, lang);
+      } else {
+        next = await getLiveboard(station.id, lang, signal, boardMode);
+      }
       if (signal?.aborted || sequence !== refreshSequence.current) return;
       // Tagged with the station it was fetched for, so a board that lands
       // for the start-up default is never searched for a linked departure.
       setBoard({ ...next, stationId: station.id, mode: boardMode });
       setError(null);
       lastGood.current = Date.now();
-      setUpdatedAt(lastGood.current);
+      setUpdatedAt(shownAt ? shownAt.getTime() : lastGood.current);
+      setLiveReady(true);
     } catch (err) {
       if (signal?.aborted || err?.name === 'AbortError'
           || sequence !== refreshSequence.current) return;
@@ -1174,6 +1214,39 @@ export default function App() {
     const id = setInterval(() => refresh(controller.signal), CONFIG.refreshMs);
     return () => { controller.abort(); clearInterval(id); };
   }, [refresh]);
+
+  /* --- network disturbances, refreshed every 10 minutes ----------- */
+
+  // Only this language's own last good list is ever shown: a switch shows
+  // the new language's cache or nothing until it arrives. A failed refresh
+  // keeps what is on screen and says nothing; the next tick tries again.
+  useEffect(() => {
+    setDisturbances(peekDisturbances(lang) ?? []);
+    if (!liveReady) return undefined;
+    const controller = new AbortController();
+    let busy = false;
+    const load = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const list = MOCK
+          ? await (await mockSource()).getMockDisturbances(lang)
+          : await getDisturbances(lang, controller.signal);
+        if (!controller.signal.aborted) setDisturbances(list);
+      } catch {
+        // silent by design: last good list stays
+      } finally {
+        busy = false;
+      }
+    };
+    load();
+    const id = setInterval(load, CONFIG.disturbancesRefreshMs);
+    return () => { controller.abort(); clearInterval(id); };
+  }, [lang, liveReady]);
+
+  // The strip shows unless the reader closed it on this very set.
+  const disturbanceSet = disturbances.map((d) => d.key).join('\n');
+  const showDisturbances = disturbances.length > 0 && disturbanceSet !== dismissedNotices;
 
   /* --- intermediate stations of the visible trains ---------------- */
 
@@ -1344,6 +1417,8 @@ export default function App() {
     if (link.mode === ARRIVALS) url.searchParams.set(BOARD_PARAM, ARRIVALS);
     else url.searchParams.delete(BOARD_PARAM);
     url.searchParams.delete(KIOSK_PARAM);
+    // a development-only switch, never part of a shared link
+    url.searchParams.delete(MOCK_PARAM);
     return { url: url.href };
   }, [selectedDeparture, station, destination]);
 
@@ -1493,7 +1568,8 @@ export default function App() {
     const h = noticeRef.current ? noticeRef.current.offsetHeight : 0;
     document.documentElement.style.setProperty('--notice-h', `${h}px`);
     refitRows();
-  }, [notice?.text, notice?.kind, destination, scanning, partial, rows, refitRows]);
+  }, [notice?.text, notice?.kind, destination, scanning, partial, rows, refitRows,
+    showDisturbances, kiosk]);
 
   // The missing-departure line is drawn as the board's first row, in a
   // row's height, so on a fitted desktop board it takes one train's slot
@@ -1520,7 +1596,7 @@ export default function App() {
       ? rows
       : Math.max(rendered, minimumSlots);
     document.documentElement.style.setProperty('--rows', fittedRows);
-  }, [boardSlots, notice?.text, notice?.kind, destination, rows]);
+  }, [boardSlots, notice?.text, notice?.kind, destination, rows, showDisturbances]);
 
   // What the board says when it has no rows to draw. With a destination
   // filter on, "no departures" would be wrong twice over: the station does
@@ -1665,6 +1741,22 @@ export default function App() {
   const openLegal = useCallback(() => setInfo('legal'), []);
   const openContact = useCallback(() => setInfo('contact'), []);
   const closeInfo = useCallback(() => setInfo(null), []);
+  const openDisturbances = useCallback(() => setInfo('disturbances'), []);
+  // Focus goes where the unknown-station X sends it: the first train,
+  // else the search control.
+  const dismissDisturbances = useCallback(() => {
+    setDismissedNotices(disturbanceSet);
+    requestAnimationFrame(() => {
+      const screen = screenRef.current;
+      (screen?.querySelector('.departure-row.is-openable')
+        || screen?.querySelector('.topbar-pick'))?.focus();
+    });
+  }, [disturbanceSet]);
+  // An empty panel is never shown: if the last notice goes, so does it.
+  // Kiosk is read-only, so it never keeps the panel open either.
+  useEffect(() => {
+    if (info === 'disturbances' && (kiosk || !disturbances.length)) setInfo(null);
+  }, [info, kiosk, disturbances.length]);
 
   // Keep obscured application content out of both keyboard navigation and
   // the accessibility tree without placing either overlay inside an inert
@@ -1703,6 +1795,7 @@ export default function App() {
         fullscreenLabel={t.fullscreen}
         fullscreenExitLabel={t.fullscreenExit}
         kiosk={kiosk}
+        fixedNow={mockClock}
         boardMode={boardMode}
         boardLabels={{ [DEPARTURES]: t.boardDepartures, [ARRIVALS]: t.boardArrivals }}
         boardPickLabel={t.boardPick}
@@ -1735,7 +1828,7 @@ export default function App() {
         onOpen={openDeparture}
       />
 
-      {(destination || notice) && (
+      {(destination || notice || showDisturbances) && (
         <div className="notice-stack" ref={noticeRef}>
           {destination && (
             <div className="notice notice--route">
@@ -1786,6 +1879,41 @@ export default function App() {
               )}
             </div>
           )}
+          {/* Network-wide, never matched to this station or its trains.
+              Read-only in kiosk; elsewhere it opens the notices. Polling
+              changes it quietly: no live region. The X hides this set of
+              notices until the set changes. */}
+          {showDisturbances && (
+            <div className="notice notice--info notice--dismissible">
+              {kiosk ? (
+                <span className="notice__text">
+                  <span aria-hidden="true">⚠ </span>{t.disturbanceCount(disturbances.length)}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="notice__text notice__open"
+                  onClick={openDisturbances}
+                  aria-haspopup="dialog"
+                >
+                  <span aria-hidden="true">⚠ </span>{t.disturbanceCount(disturbances.length)}
+                </button>
+              )}
+              {/* In kiosk the X sleeps with the cursor, like the exit button. */}
+              <button
+                type="button"
+                className={`notice__clear${kiosk ? ' notice__clear--kiosk' : ''}`}
+                onClick={dismissDisturbances}
+                aria-label={t.dismissWarning}
+                title={t.dismissWarning}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1815,7 +1943,13 @@ export default function App() {
         onToggleFavorite={toggleFavorite}
       />
 
-      <AboutModal kind={info} t={t} onClose={closeInfo} />
+      <AboutModal
+        kind={info}
+        t={t}
+        disturbances={disturbances}
+        dateLocale={DATE_LOCALES[lang] ?? 'en-GB'}
+        onClose={closeInfo}
+      />
 
       <div className="sr-only" role="alert">{error ? t.offline : ''}</div>
       {/* Set once when a linked departure is not found; the board's own

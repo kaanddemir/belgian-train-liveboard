@@ -284,6 +284,26 @@ body{
 .notice--info .notice__clear:active{ background:var(--color-surface-active); }
 .notice--info .notice__clear:focus-visible{ outline-color:var(--color-board-bg); }
 
+/* iRail's network-wide service notices: the same yellow dismissible strip,
+   last in the stack. Its text is a native button that opens the list. */
+.notice__open{
+  padding:0;
+  border:0;
+  border-radius:var(--radius-sm);
+  background:none;
+  color:inherit;
+  font:inherit;
+  text-align:left;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.notice__open:hover{ text-decoration:underline; text-underline-offset:.2em; }
+.notice__open:active{ opacity:.85; }
+.notice__open:focus-visible{
+  outline:2px solid var(--color-board-bg);
+  outline-offset:2px;
+}
+
 /* Both strips sit in one measured box, so --notice-h still describes the
    whole foot of the screen and fitRows() keeps its arithmetic. */
 .notice-stack{ flex:0 0 auto; }
@@ -694,11 +714,12 @@ body{
    every control too. Only the class ever set it; leaving kiosk removes it. */
 body.kiosk-idle,
 body.kiosk-idle *{ cursor:none !important; }
-/* The exit button sleeps with the cursor, so the idle board reads as a
+/* The exit button (and the notice strip's X) sleeps with the cursor, so the idle board reads as a
    display. Hidden, it takes no taps: the first tap wakes it, the second
    leaves, so a passer-by cannot close kiosk by accident. Keyboard focus
    still shows it. */
-body.kiosk-idle .topbar-kiosk-exit:not(:focus-visible){
+body.kiosk-idle .topbar-kiosk-exit:not(:focus-visible),
+body.kiosk-idle .notice__clear--kiosk:not(:focus-visible){
   opacity:0;
   pointer-events:none;
 }
@@ -2113,6 +2134,18 @@ body:not(.kiosk-idle) .departure-row.is-openable:hover{ background:var(--color-c
   line-height:1.5;
 }
 .about-panel__body p{ margin:0; }
+/* a notice's own paragraphs, kept as the API breaks them */
+.about-panel__text{ white-space:pre-line; overflow-wrap:break-word; }
+/* Service notices: a board-row rule between one notice and the next, and
+   more room there than between a notice's own paragraphs, so each notice
+   ends before the next begins. A single notice draws no rule. */
+.about-panel__section--notice + .about-panel__section--notice{
+  margin-top:var(--space-2);
+  padding-top:var(--space-5);
+  border-top:1px solid var(--color-divider);
+}
+.about-panel__section--notice .about-panel__text,
+.about-panel__section--notice .about-panel__text + p{ margin-top:var(--space-1); }
 /* Legal sections: a heading in the board's emphasis weight over one
    short paragraph; no card, no rule, no second colour. */
 .about-panel__section{
