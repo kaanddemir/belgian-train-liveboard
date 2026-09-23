@@ -2,7 +2,7 @@
 
 Belgian Train Liveboard is an independent, unofficial, non-commercial web application for viewing live SNCB/NMBS departures and arrivals in a station-display-inspired interface. It uses public railway information from [iRail](https://docs.irail.be/).
 
-**Live Demo:** [trainboard.be](https://trainboard.be/)
+**Website:** [trainboard.be](https://trainboard.be/)
 
 <img src="docs/screenshots/liveboard-desktop.png" alt="Belgian Train Liveboard showing live departures from Bruxelles-Central" width="100%">
 
