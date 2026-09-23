@@ -59,6 +59,8 @@ const INFRABEL = 'https://opendata.infrabel.be/api/explore/v2.1/catalog/datasets
 const DAILY_SET = 'ruwe-gegevens-van-stiptheid-d-1';
 const MONTHLY_SET = 'stiptheid-gegevens-maandelijksebestanden';
 const IRAIL_STATIONS = 'https://api.irail.be/v1/stations/?format=json&lang=';
+// Identifies this project to the open-data providers it calls.
+const USER_AGENT = 'belgian-train-liveboard (github.com/kaanddemir/belgian-train-liveboard)';
 
 // The window is exactly this many days, counted back from the newest
 // service day collected. Not a default and not a floor.
@@ -145,7 +147,7 @@ const SHORTEST_WINDOW = WINDOWS.at(-1).days;
 const out = (line = '') => process.stdout.write(`${line}\n`);
 
 async function fetchJson(url) {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': USER_AGENT } });
   if (!res.ok) throw new Error(`${url} -> ${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -178,7 +180,7 @@ function splitCsvLine(line) {
 // datasets spell their headers differently in case and carry different
 // column sets; lower-casing is all it takes to read both with one path.
 async function* csvRows(url) {
-  const res = await fetch(url, { headers: { Accept: 'text/csv' } });
+  const res = await fetch(url, { headers: { Accept: 'text/csv', 'User-Agent': USER_AGENT } });
   if (!res.ok) throw new Error(`${url} -> ${res.status} ${res.statusText}`);
   const decoder = new TextDecoder('utf-8');
   let buffer = '';

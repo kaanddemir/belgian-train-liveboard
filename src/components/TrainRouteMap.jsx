@@ -32,7 +32,7 @@ import { formatTime } from './DepartureRow.jsx';
    TrainDetailsModal, so the map has no chrome of its own.
    ------------------------------------------------------------------ */
 
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 // Leaflet takes [latitude, longitude]; everything upstream of this file

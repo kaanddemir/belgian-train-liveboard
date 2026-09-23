@@ -38,6 +38,8 @@ const OUT = resolve(ROOT, 'public/generated/belgian-rail-graph.json');
 const API = 'https://opendata.infrabel.be/api/explore/v2.1/catalog/datasets';
 const GEOMETRY_SET = 'station_to_station';
 const POINT_SET = 'operationele-punten-van-het-netwerk';
+// Identifies this project to the open-data providers it calls.
+const USER_AGENT = 'belgian-train-liveboard (github.com/kaanddemir/belgian-train-liveboard)';
 
 // Infrabel states its geography supports representation to roughly
 // 1:25 000. Five decimals is about a metre — far finer than that, and
@@ -70,7 +72,7 @@ async function fetchDataset(id) {
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': USER_AGENT } });
   if (!res.ok) throw new Error(`${url} -> ${res.status} ${res.statusText}`);
   return res.json();
 }
