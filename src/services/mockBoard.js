@@ -503,7 +503,13 @@ const byNumber = (number) => scenario.trains.find((t) => t.number === String(num
 const stopsCache = new Map();
 const routeCache = new Map();
 
-const boardStation = (station) => station?.name || 'Bruxelles-Central';
+// Until /stations resolves, App's default station has no name yet. The
+// fallback is that station's name in the board's language, as iRail would
+// print it, so the board does not start in French and switch languages.
+const DEFAULT_NAME = {
+  nl: 'Brussel-Centraal', fr: 'Bruxelles-Central', en: 'Brussels-Central', de: 'Brüssel-Zentral',
+};
+const boardStation = (station, lang = 'en') => station?.name || DEFAULT_NAME[lang] || DEFAULT_NAME.en;
 
 // Stands in for getLiveboard(): the station keeps its real name, so
 // ?mock= and ?station= describe the same board together.
@@ -517,7 +523,7 @@ export async function getMockLiveboard(station, mode = 'departures', lang = 'en'
     ? scenario.trains.filter((t) => t.before?.length)
     : scenario.trains.filter((t) => !t.arrivalOnly);
   return {
-    station: boardStation(station),
+    station: boardStation(station, lang),
     alerts: scenario.alert ? [scenario.alert[lang] ?? scenario.alert.en] : [],
     departures: trains.map((t) => mockDeparture(t, arrival)).sort((a, b) => a.time - b.time),
   };
@@ -539,16 +545,16 @@ export function getMockStops(id, afterTime, direction = 'after') {
 
 // Stands in for getRoute(): the whole journey, origin to terminus, with
 // the board's own station stamped so the timeline can mark it.
-export async function getMockRoute(id, station) {
+export async function getMockRoute(id, station, lang = 'en') {
   const t = byVehicle(id);
   await pause(t?.routeDelayMs);
   if (!t || t.journey === false) return null;
-  const key = `${id}|${station?.id || ''}`;
+  const key = `${id}|${station?.id || ''}|${boardStation(station, lang)}`;
   if (!routeCache.has(key)) {
     const delay = t.delay ?? 0;
     routeCache.set(key, [
       ...(t.before ?? []).map((s) => mockStop(s, delay)),
-      mockStop([boardStation(station), t.minutes], delay, station?.id || '', t.occupancy ?? null),
+      mockStop([boardStation(station, lang), t.minutes], delay, station?.id || '', t.occupancy ?? null),
       ...t.after.map((s) => mockStop(s, delay)),
     ]);
   }

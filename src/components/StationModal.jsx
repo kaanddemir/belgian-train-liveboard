@@ -325,6 +325,8 @@ export default function StationModal({
             key={station.id}
             id={`station-option-${i}`}
             role="option"
+            // the station alone: the star inside is a control of its own
+            aria-label={station.name}
             aria-selected={i === active}
             className={`station-result${i === active ? ' is-active' : ''}`}
             onMouseEnter={() => setActive(i)}

@@ -1432,7 +1432,7 @@ export default function App() {
     setRoute(null);
     setRouteLoading(true);
     const journey = MOCK
-      ? mockSource().then((m) => m.getMockRoute(selectedDeparture.vehicleId, stationRef.current))
+      ? mockSource().then((m) => m.getMockRoute(selectedDeparture.vehicleId, stationRef.current, lang))
       : getRoute(selectedDeparture.vehicleId, selectedDeparture.stationId, selectedDeparture.time, lang);
     journey
       .then((stops) => { if (!cancelled) { setRoute(stops); setRouteLoading(false); } });
