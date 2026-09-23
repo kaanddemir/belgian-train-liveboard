@@ -51,7 +51,7 @@ export default function Header({
   kiosk = false, kioskLabel, onKiosk, kioskExitLabel, onKioskExit,
   boardMode = 'departures', boardLabels = {}, boardPickLabel, onBoard, onBoardMenu,
   menuLabel, aboutLabel, onAbout, legalLabel, onLegal, contactLabel, onContact,
-  stationLabel, updatedLabel, updatedAt,
+  stationLabel, updatedLabel, updatedAt, fixedNow = null,
 }) {
   const fullscreen = useFullscreen();
   const [now, setNow] = useState(() => new Date());
@@ -67,10 +67,13 @@ export default function Header({
   const boardBtnRef = useRef(null);
   const boardMenuRef = useRef(null);
 
+  // `fixedNow` is set only by the development mock, for repeatable
+  // screenshots; the live board always ticks.
   useEffect(() => {
+    if (fixedNow) return undefined;
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [fixedNow]);
 
   const closeMenu = useCallback(({ restoreFocus = true } = {}) => {
     setMenuOpen(false);
@@ -192,7 +195,7 @@ export default function Header({
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <span className="topbar-clock">{clockFormat.format(now)}</span>
+        <span className="topbar-clock">{clockFormat.format(fixedNow ?? now)}</span>
         {/* The station name is also a way into the picker, the same action
             as the search button, for anyone who reaches for the name. Kiosk
             hides that button, so there the name is plain text again. */}
