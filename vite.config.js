@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// The board is published as a GitHub Pages project site, so every asset
-// lives under the repository path. `base` is the one place that knows it;
-// runtime fetches read it back through import.meta.env.BASE_URL.
+// The board is published on GitHub Pages under its own domain
+// (trainboard.be), so every asset lives at the site root. `base` is the
+// one place that knows it; runtime fetches read it back through
+// import.meta.env.BASE_URL.
 export default defineConfig({
-  base: '/belgian-train-liveboard/',
+  base: '/',
   plugins: [react()],
 });
