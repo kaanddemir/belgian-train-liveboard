@@ -248,6 +248,7 @@ const TEXT = {
     fullscreen: 'Volledig scherm',
     fullscreenExit: 'Volledig scherm verlaten',
     kiosk: 'Kioskmodus',
+    kioskExit: 'Kioskmodus verlaten',
     unknownStation: (s) => `Onbekend station “${s}”`,
     details: 'Treindetails',
     close: 'Sluiten',
@@ -377,6 +378,7 @@ const TEXT = {
     fullscreen: 'Plein écran',
     fullscreenExit: 'Quitter le plein écran',
     kiosk: 'Mode kiosque',
+    kioskExit: 'Quitter le mode kiosque',
     unknownStation: (s) => `Gare inconnue « ${s} »`,
     details: 'Détails du train',
     close: 'Fermer',
@@ -506,6 +508,7 @@ const TEXT = {
     fullscreen: 'Full screen',
     fullscreenExit: 'Exit full screen',
     kiosk: 'Kiosk mode',
+    kioskExit: 'Exit kiosk mode',
     unknownStation: (s) => `Unknown station “${s}”`,
     details: 'Train details',
     close: 'Close',
@@ -635,6 +638,7 @@ const TEXT = {
     fullscreen: 'Vollbild',
     fullscreenExit: 'Vollbild beenden',
     kiosk: 'Kioskmodus',
+    kioskExit: 'Kioskmodus beenden',
     unknownStation: (s) => `Unbekannter Bahnhof „${s}“`,
     details: 'Zugdetails',
     close: 'Schließen',
@@ -1605,19 +1609,19 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [kiosk, exitKiosk]);
 
-  // The cursor goes after a few still seconds and comes back on the next
-  // mouse movement. Touch and pen never hide it: they have no cursor.
+  // The cursor and the exit button go after a few still seconds and come
+  // back on the next movement or tap — touch included, or a phone would
+  // have no way to bring the exit button back.
   useEffect(() => {
     if (!kiosk) return undefined;
     const body = document.body;
     let timer = 0;
-    const wake = (e) => {
-      if (e.pointerType && e.pointerType !== 'mouse') return;
+    const wake = () => {
       body.classList.remove('kiosk-idle');
       clearTimeout(timer);
       timer = setTimeout(() => body.classList.add('kiosk-idle'), KIOSK_IDLE_MS);
     };
-    wake({});
+    wake();
     window.addEventListener('pointermove', wake, { passive: true });
     window.addEventListener('pointerdown', wake, { passive: true });
     return () => {
@@ -1706,6 +1710,8 @@ export default function App() {
         onBoardMenu={onBoardMenu}
         kioskLabel={t.kiosk}
         onKiosk={enterKiosk}
+        kioskExitLabel={t.kioskExit}
+        onKioskExit={exitKiosk}
         menuLabel={t.menu}
         aboutLabel={t.about}
         legalLabel={t.legal}

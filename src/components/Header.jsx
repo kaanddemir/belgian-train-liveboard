@@ -48,7 +48,7 @@ export default function Header({
   station, title, onPickStation, pickLabel,
   languages = [], lang, onLanguage, languageLabel,
   fullscreenLabel, fullscreenExitLabel,
-  kiosk = false, kioskLabel, onKiosk,
+  kiosk = false, kioskLabel, onKiosk, kioskExitLabel, onKioskExit,
   boardMode = 'departures', boardLabels = {}, boardPickLabel, onBoard, onBoardMenu,
   menuLabel, aboutLabel, onAbout, legalLabel, onLegal, contactLabel, onContact,
   stationLabel, updatedLabel, updatedAt,
@@ -262,7 +262,22 @@ export default function Header({
         {/* Search stays in the bar: it is the one control the board is
             actually operated with. Everything else moved into the menu
             beside it, so the title bar reads as a screen, not a toolbar.
-            Kiosk mode drops both: the screen is only for reading. */}
+            Kiosk mode drops both: the screen is only for reading, and
+            leaves one close button, since touch screens have no Escape. */}
+        {kiosk && (
+          <button
+            type="button"
+            className="topbar-pick topbar-kiosk-exit"
+            onClick={onKioskExit}
+            aria-label={kioskExitLabel}
+            title={kioskExitLabel}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
+          </button>
+        )}
         {!kiosk && (<>
         <button
           type="button"

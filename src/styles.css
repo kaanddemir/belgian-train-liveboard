@@ -694,6 +694,14 @@ body{
    every control too. Only the class ever set it; leaving kiosk removes it. */
 body.kiosk-idle,
 body.kiosk-idle *{ cursor:none !important; }
+/* The exit button sleeps with the cursor, so the idle board reads as a
+   display. Hidden, it takes no taps: the first tap wakes it, the second
+   leaves, so a passer-by cannot close kiosk by accident. Keyboard focus
+   still shows it. */
+body.kiosk-idle .topbar-kiosk-exit:not(:focus-visible){
+  opacity:0;
+  pointer-events:none;
+}
 
 /* =========================
    Departure Board
@@ -1562,7 +1570,9 @@ body.modal-open{ overflow:hidden; }
    standard focus ring. No card, no lift, no animation. */
 
 .departure-row.is-openable{ cursor:pointer; }
-.departure-row.is-openable:hover{ background:var(--color-control-hover); }
+/* An idle kiosk has hidden the cursor, so the row under it must not stay
+   washed as if still pointed at. */
+body:not(.kiosk-idle) .departure-row.is-openable:hover{ background:var(--color-control-hover); }
 .departure-row.is-openable:focus-visible{
   outline:2px solid var(--color-board-text);
   outline-offset:-3px;
