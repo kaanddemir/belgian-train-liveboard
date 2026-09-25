@@ -97,6 +97,10 @@ describe('journey resolution around midnight', () => {
     .map(([url]) => new URL(url).searchParams.get('date'));
 
   beforeEach(async () => {
+    // The journey caches prune by the real clock (older than yesterday),
+    // so pin "now" to the fixtures' night or they are evicted on settle.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-22T22:00:00Z'));
     journeys = {};
     fetchMock = vi.fn(async (url) => {
       const body = journeys[new URL(url).searchParams.get('date')];
@@ -108,7 +112,10 @@ describe('journey resolution around midnight', () => {
     irail = await import('../src/services/irail.js');
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   // Row: 23 Sep 00:05 Brussels (22:05 UTC on 22 Sep).
   const ROW = at('2026-09-22T22:05:00Z');
