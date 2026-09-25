@@ -231,7 +231,7 @@ The application has no user accounts, authentication, analytics, tracking, or co
 - `preferredLanguage` — the last language selected
 - `favoriteStationSlugs` — up to 5 favourite station slugs
 
-Departure boards, train journeys, destination filters, and API caches are not persisted. Your location is read only when you press the nearest-station button, used in the browser to pick from the station list, and never stored or sent anywhere. Requests for railway data go directly from the browser to iRail; opening the optional map also requests the local rail graph and OpenStreetMap tiles.
+Departure and arrival boards, train journeys, destination filters, and API caches are not persisted. Your location is read only when you press the nearest-station button, used in the browser to pick from the station list, and never stored or sent anywhere. Requests for railway data go directly from the browser to iRail; opening the optional map also requests the local rail graph and OpenStreetMap tiles.
 
 ## Disclaimer
 

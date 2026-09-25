@@ -6,7 +6,7 @@ about how to change it safely.
 
 ## Project purpose
 
-A browser recreation of the SNCB/NMBS departure displays installed in
+A browser recreation of the SNCB/NMBS departure and arrival displays installed in
 Belgian stations, fed by live iRail data. The UI **intentionally mimics
 real railway information screens** — the layouts, colours and
 proportions were measured from photographs of installed displays, not
